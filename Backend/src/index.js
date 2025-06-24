@@ -100,6 +100,7 @@ async function setupServer() {
     app.use('/api/payments', paymentRoutes);
 
     const uploadPath = path.resolve("src/uploads");
+
     app.use("/uploads", express.static(uploadPath));
 
     // 4. Ruta de prueba básica

@@ -13,6 +13,14 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, '')
       }
     },
-    allowedHosts: ['localhost', 'eccomerce-cyizlkvn3-tyrf1ngs-projects.vercel.app','b896-190-5-38-87.ngrok-free.app']
+    allowedHosts: [
+      'localhost', 
+      'eccomerce-cyizlkvn3-tyrf1ngs-projects.vercel.app',
+      'b896-190-5-38-87.ngrok-free.app'
+    ]
+  },
+  preview: {
+    host: '0.0.0.0',
+    port: 443
   }
 })

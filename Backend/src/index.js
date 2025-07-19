@@ -9,6 +9,8 @@ import passport from "passport";
 import express, { json, urlencoded } from "express";
 import {
   cookieKey,
+  WEB_HOST,
+  WEB_PORT,
   DB_HOST,
   DB_PORT,
   DB_USERNAME,
@@ -16,7 +18,7 @@ import {
   DB_DATABASE
 } from "./config/configENV.js";
 import { connectDB } from "./config/configDB.js";
-// COMBINAR AMBAS IMPORTACIONES
+
 import { createProductos, createUser, createCategoria, createValoraciones, createCompra_Producto, createEnvios, createCompras} from "./config/initialSetup.js";
 import { passportJwtSetup } from "./auth/passport.auth.js";
 import path from "path";
@@ -47,7 +49,7 @@ async function setupServer() {
       tableName: 'session',
     });
 
-    // 2. Webhook de Mercado Pago
+    
     app.post(
       '/api/payments/webhook',
       bodyParser.raw({ type: 'application/json' }),
@@ -64,7 +66,7 @@ async function setupServer() {
         console.log('Método:', req.method);
         console.log('URL:', req.originalUrl);
         console.log('Headers:', req.headers);
-        // HEXADECIMAL Y BYTES
+       
         console.log('Raw Body (utf8):', req.rawBody);
         console.log('Raw Body (hex):', Buffer.from(req.rawBody).toString('hex'));
         console.log('Raw Body (bytes):', Buffer.from(req.rawBody));
@@ -74,7 +76,7 @@ async function setupServer() {
       handleWebhook
     );
 
-    // Deshabilita el encabezado "x-powered-by" por seguridad
+    
     app.disable("x-powered-by");
 
    
@@ -104,14 +106,14 @@ async function setupServer() {
       next();
     });
 
-    // Middlewares globales para procesar JSON y URL-encoded
+    
     app.use(urlencoded({ extended: true, limit: "1mb" }));
     app.use(json({ limit: "1mb" }));
 
     app.use(cookieParser());
     app.use(morgan("dev"));
 
-    // Configuración de la sesión
+    
     const sessionMiddleware = session({
       secret: process.env.SESSION_SECRET || cookieKey,
       store: sessionStore,
@@ -137,11 +139,9 @@ async function setupServer() {
 
     app.use("/api", indexRoutes);
     
-    // TUS RUTAS (pagos y chilexpress)
     app.use('/api/payments', paymentRoutes);
     app.use('/api/chilexpress', chilexpressRoutes);
     
-    // RUTAS DE TUS COMPAÑEROS (productos, categorías, etc.)
     app.use("/api/productos", productosRoutes);
     app.use("/api/categorias", categoriasRoutes);
     app.use("/api/valoraciones", valoracionesRoutes);
@@ -167,9 +167,8 @@ async function setupServer() {
       res.status(500).json({ error: 'Algo salió mal' });
     });
 
-    // Configuración del puerto y host
-    app.listen(DB_PORT, DB_HOST, () => {
-      console.log(`=> Servidor corriendo en http://${DB_HOST}:${DB_PORT}/api`);
+    app.listen(WEB_PORT, WEB_HOST, () => {
+      console.log(`=> Servidor corriendo en http://${WEB_HOST}:${WEB_PORT}/api`);
     });
   } catch (error) {
     console.log("Error en index.js -> setupServer(), el error es: ", error);

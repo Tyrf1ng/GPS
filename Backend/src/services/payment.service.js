@@ -13,18 +13,14 @@ export class PaymentService {
       const usuarioRepository = AppDataSource.getRepository(Usuario);
       const direccionRepository = AppDataSource.getRepository(Direccion);
 
-      // 1. Obtener el email del comprador desde el formulario
       const emailForm = datosPersonales.email || "";
 
-      // 2. Buscar usuario por email del formulario
       let usuarioInvitado = await usuarioRepository.findOne({
         where: { email: emailForm }
       });
 
-      // 3. Si no existe, crear dirección y usuario invitado con los datos del form
       let direccionGuardada = null;
       if (!usuarioInvitado) {
-        // Crear dirección
         const direccionData = {
           direccion: datosPersonales.address || "",
           ciudad: datosPersonales.ciudad || datosPersonales.comunaCode || "No especificada",
@@ -35,17 +31,14 @@ export class PaymentService {
         };
         direccionGuardada = await direccionRepository.save(direccionData);
 
-        // Usar los campos separados y nombre incremental
         const baseName = (datosPersonales.nombres || "Invitado").replace(/\s+/g, '');
         const invitadoNamePrefix = `${baseName}_invitado_`;
 
-        // Buscar cuántos invitados hay con ese nombre base
         const existingInvitados = await usuarioRepository
           .createQueryBuilder("usuario")
           .where("usuario.nombreCompleto LIKE :prefix", { prefix: `${invitadoNamePrefix}%` })
           .getCount();
 
-        // Siguiente número incremental
         const nuevoNombre = `${invitadoNamePrefix}${existingInvitados + 1}`;
 
         usuarioInvitado = usuarioRepository.create({
@@ -54,14 +47,13 @@ export class PaymentService {
           telefono: datosPersonales.phone || "",
           password: "null",
           rol: "invitado",
-          id_direccion: direccionGuardada.id_direccion 
+          id_direccion: direccionGuardada.id_direccion
         });
         usuarioInvitado = await usuarioRepository.save(usuarioInvitado);
       }
 
       const idUsuario = usuarioInvitado.id_usuario;
 
-      // 4. Guardar la compra, incluyendo ambos emails
       const compraData = {
         payment_id: transactionData.payment_id,
         payment_status: transactionData.status,
@@ -73,28 +65,43 @@ export class PaymentService {
         id_usuario: idUsuario,
         nombre: datosPersonales.nombres || "",
         apellido: datosPersonales.apellidos || "",
-        email: emailForm, // Email del formulario
+        email: emailForm,
         telefono: datosPersonales.phone || "",
         direccion: datosPersonales.address || "",
         region: datosPersonales.region || datosPersonales.regionCode || "",
         ciudad: datosPersonales.ciudad || datosPersonales.comunaCode || "",
         codigo_postal: datosPersonales.postalCode || "",
         instrucciones: datosPersonales.instructions || "",
-        // Puedes agregar campo para email de MercadoPago si quieres:
         email_mp: transactionData.email || ""
       };
 
       const compra = compraRepository.create(compraData);
       const compraGuardada = await compraRepository.save(compra);
 
-      // 5. Guardar productos comprados (con id_producto ya incluido desde frontend)
       if (Array.isArray(productos)) {
+        console.log('=== DEBUG PRODUCTOS EN PAYMENT SERVICE ===');
+        console.log('Productos recibidos:', JSON.stringify(productos, null, 2));
+        
         for (const prod of productos) {
+          console.log('Procesando producto:', {
+            id_producto: prod.id_producto,
+            cantidad: prod.cantidad || prod.quantity || 1,
+            precio: prod.precio || prod.price,
+            estructura_completa: Object.keys(prod)
+          });
+          
           if (prod.id_producto) {
+            const precio_unitario = prod.precio || prod.price || 0;
+            
+            if (precio_unitario === 0) {
+              console.warn(`⚠️ PRECIO CERO para producto ${prod.id_producto}:`, prod);
+            }
+            
             const compraProd = compraProductoRepository.create({
               id_compra: compraGuardada.id_compra,
               id_producto: prod.id_producto,
-              cantidad: prod.cantidad || prod.quantity || 1
+              cantidad: prod.cantidad || prod.quantity || 1,
+              precio_unitario: precio_unitario 
             });
             await compraProductoRepository.save(compraProd);
           }
@@ -117,7 +124,6 @@ export class PaymentService {
       const compraRepository = AppDataSource.getRepository(Compra);
       return await compraRepository.findOne({
         where: { payment_id: paymentId }
-        // Quitar todas las relaciones por ahora
       });
     } catch (error) {
       console.error('Error al obtener compra por paymentId:', error);

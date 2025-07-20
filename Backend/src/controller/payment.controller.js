@@ -12,7 +12,6 @@ export const createPreference = async (req, res) => {
   try {
     const { items, external_reference, shipping_info } = req.body;
 
-    // Guardar temporalmente datos personales y productos
     await compraTemporalService.saveCompraTemporal(external_reference, items, shipping_info);
 
     const body = {
@@ -86,7 +85,6 @@ export const handleWebhook = async (req, res) => {
           email: paymentData.payer?.email || "" 
         };
 
-        // Recuperar productos y datosPersonales usando external_reference
         const temporalData = await compraTemporalService.getCompraTemporal(transactionData.external_reference);
         const productos = temporalData ? temporalData.productos : [];
         const datosPersonales = temporalData ? temporalData.datosPersonales : {};
@@ -94,7 +92,6 @@ export const handleWebhook = async (req, res) => {
         const paymentService = new PaymentService();
         await paymentService.saveTransaction(transactionData, productos, datosPersonales);
 
-        // Eliminar registro temporal
         await compraTemporalService.deleteCompraTemporal(transactionData.external_reference);
 
       } catch (error) {

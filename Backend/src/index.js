@@ -147,6 +147,7 @@ async function setupServer() {
     app.use("/api/valoraciones", valoracionesRoutes);
     app.use("/api/minio", minioRutes);
     app.use("/api/shipping", shippingRoutes);
+    app.use('/api/reserva-stock', reservaStockRoutes);
 
     app.get('/api/minio/test', (req, res) => {
       minioClient.listBuckets((err, buckets) => {

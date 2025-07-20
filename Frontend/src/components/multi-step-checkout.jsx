@@ -19,6 +19,7 @@ import {
   Minus,
   Plus,
   X,
+  Clock, 
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_BASE_URL || "http://localhost:3000/api";
@@ -486,6 +487,10 @@ function MultiStepCheckout() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [reservaActiva, setReservaActiva] = useState(false);
+  const [tiempoRestante, setTiempoRestante] = useState(null);
+  const [externalReferenceActual, setExternalReferenceActual] = useState(null);
+
   const {
     loading: loadingCobertura,
     error: errorCobertura,
@@ -530,6 +535,33 @@ function MultiStepCheckout() {
     cotizarEnvio,
     resetQuote,
   ]);
+
+  useEffect(() => {
+    let interval;
+    
+    if (reservaActiva && tiempoRestante > 0) {
+      interval = setInterval(() => {
+        setTiempoRestante((prev) => {
+          if (prev <= 1) {
+            setReservaActiva(false);
+            setError("⏰ La reserva de stock ha expirado. Por favor, intenta nuevamente.");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [reservaActiva, tiempoRestante]);
+
+  const formatTiempoRestante = (segundos) => {
+    const minutos = Math.floor(segundos / 60);
+    const segs = segundos % 60;
+    return `${minutos}:${segs.toString().padStart(2, '0')}`;
+  };
 
   const steps = [
     { label: "Carrito", icon: <Package className="w-5 h-5" /> },
@@ -596,6 +628,38 @@ function MultiStepCheckout() {
     setError(null);
 
     try {
+      const externalReference = `ORD-${Date.now()}`;
+      setExternalReferenceActual(externalReference);
+      
+      const productos = carrito.map((item) => ({
+        id_producto: item.id_producto,
+        quantity: item.cantidad || 1,
+      }));
+
+      console.log('🔒 Creando reserva de stock...');
+      const reservaResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/reserva-stock/crear`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productos,
+            external_reference: externalReference,
+          }),
+        }
+      );
+
+      if (!reservaResponse.ok) {
+        const errorData = await reservaResponse.json();
+        throw new Error(errorData.message || 'Error al reservar stock');
+      }
+
+      const reservaData = await reservaResponse.json();
+      console.log('✅ Stock reservado exitosamente:', reservaData);
+      
+      setReservaActiva(true);
+      setTiempoRestante(15 * 60);
+
       const items = carrito.map((item) => ({
         id_producto: item.id_producto,
         title: item.nombre,
@@ -603,6 +667,7 @@ function MultiStepCheckout() {
         quantity: item.cantidad || 1,
       }));
 
+      console.log('💳 Creando preferencia de pago...');
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/payments/create_preference`,
         {
@@ -610,20 +675,41 @@ function MultiStepCheckout() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             items,
-            external_reference: `ORD-${Date.now()}`,
+            external_reference: externalReference,
             shipping_info: shippingData,
           }),
         }
       );
 
-      if (!response.ok)
-        throw new Error("Error al crear la preferencia de pago");
+      if (!response.ok) {
+        console.warn('❌ Error al crear preferencia, cancelando reserva...');
+        await fetch(
+          `${import.meta.env.VITE_API_URL}/reserva-stock/cancelar`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              external_reference: externalReference,
+            }),
+          }
+        ).catch(err => console.error('Error al cancelar reserva:', err));
+        
+        setReservaActiva(false);
+        setTiempoRestante(null);
+        throw new Error('Error al crear preferencia de pago');
+      }
 
       const data = await response.json();
       setPreferenceId(data.preferenceId || data.id);
+      
+      console.log('🚀 Preferencia creada, redirigiendo a MercadoPago...');
+
     } catch (err) {
       console.error("Checkout error:", err);
-      setError("Error al procesar el pago. Intenta nuevamente.");
+      setError(err.message || "Error al procesar el pago. Intenta nuevamente.");
+      setReservaActiva(false);
+      setTiempoRestante(null);
+      setExternalReferenceActual(null);
     } finally {
       setLoading(false);
     }
@@ -658,7 +744,7 @@ function MultiStepCheckout() {
               <div className="space-y-4">
                 {carrito.map((item) => (
                   <CartItem
-                    key={item.id_producto} // ✅ Usar id_producto como key
+                    key={item.id_producto} 
                     title={item.nombre}
                     price={Number(item.precio.toString().replace(/\./g, ""))}
                     quantity={item.cantidad || 1}
@@ -726,6 +812,26 @@ function MultiStepCheckout() {
             <h3 className="text-lg font-semibold text-gray-900">
               Confirma tu Pedido
             </h3>
+
+            {/* ✅ MOSTRAR ALERTA DE RESERVA ACTIVA */}
+            {reservaActiva && tiempoRestante && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <Clock className="w-5 h-5 text-amber-600 mr-3 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-amber-800 font-medium">
+                      🔒 Stock reservado temporalmente
+                    </p>
+                    <p className="text-amber-600 text-sm">
+                      Tiempo restante: <span className="font-mono font-bold">{formatTiempoRestante(tiempoRestante)}</span>
+                    </p>
+                    <p className="text-amber-500 text-xs mt-1">
+                      Complete el pago antes de que expire la reserva
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-4">
               <h4 className="font-medium text-gray-700">Productos:</h4>

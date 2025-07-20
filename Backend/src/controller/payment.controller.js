@@ -4,6 +4,7 @@ import { PaymentService } from '../services/payment.service.js';
 import { CompraTemporalService } from "../services/compraTemporal.service.js";
 import { FRONTEND_URL } from '../config/configENV.js';
 import crypto from 'crypto';
+import { reservaStockService } from '../services/reservaStockMemoria.service.js';
 
 const preference = new Preference(mercadoPagoClient);
 const compraTemporalService = new CompraTemporalService();
@@ -84,6 +85,27 @@ export const handleWebhook = async (req, res) => {
           preference_id: paymentData.preference_id || 'N/A',
           email: paymentData.payer?.email || "" 
         };
+
+        if (transactionData.status === 'approved') {
+          console.log('💰 Pago aprobado, confirmando reserva...');
+          const resultado = await reservaStockService.confirmarReserva(transactionData.external_reference);
+          
+          if (resultado.success) {
+            console.log('✅ Stock confirmado para:', transactionData.external_reference);
+          } else {
+            console.error('❌ Error al confirmar stock:', resultado.error);
+          }
+          
+        } else if (transactionData.status === 'rejected' || transactionData.status === 'cancelled') {
+          console.log('❌ Pago rechazado/cancelado, liberando reserva...');
+          const resultado = await reservaStockService.cancelarReserva(transactionData.external_reference, 'cancelado');
+          
+          if (resultado.success) {
+            console.log('🔓 Stock liberado para:', transactionData.external_reference);
+          } else {
+            console.error('❌ Error al liberar stock:', resultado.error);
+          }
+        }
 
         const temporalData = await compraTemporalService.getCompraTemporal(transactionData.external_reference);
         const productos = temporalData ? temporalData.productos : [];

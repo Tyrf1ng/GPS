@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react"; 
 import { Link, useNavigate } from "react-router-dom";
 import { initMercadoPago, Wallet } from "@mercadopago/sdk-react";
 import { useCart } from "../context/CartContext";
 import { useChilexpressCoverage } from "../hooks/useChilexpressCoverage";
 import { useShippingQuote } from "../hooks/useShippingQuote";
 import ChilexpressRegionComunaSelector from "../components/ChilexpressRegionComunaSelector";
+import WalletComponent from './WalletComponent'; 
 
 import {
   Heart,
@@ -884,20 +885,10 @@ function MultiStepCheckout() {
               </div>
             </div>
 
-            {preferenceId && (
+            {/* ✅ USAR EL WALLET COMPONENT MEMOIZADO */}
+            {walletComponent && (
               <div className="mt-6">
-                <Wallet
-                  initialization={{ preferenceId }}
-                  customization={{
-                    texts: { valueProp: "smart_option" },
-                    theme: "default",
-                  }}
-                  onReady={() => console.log("🟢 Wallet Brick listo")}
-                  onError={(error) => {
-                    console.error("🔴 Error en el Brick:", error);
-                    setError("Error al cargar el botón de pago.");
-                  }}
-                />
+                {walletComponent}
               </div>
             )}
           </div>
@@ -915,6 +906,21 @@ function MultiStepCheckout() {
       setCurrentStep((prev) => Math.max(prev - 1, 0));
     }
   };
+
+  const walletComponent = useMemo(() => {
+    if (!preferenceId) return null;
+    
+    return (
+      <WalletComponent
+        preferenceId={preferenceId}
+        onReady={() => {
+        }}
+        onError={(error) => {
+          setError("Error al cargar el botón de pago.");
+        }}
+      />
+    );
+  }, [preferenceId]);
 
   return (
     <section className="min-h-screen min-w-screen bg-white py-8 md:py-16">

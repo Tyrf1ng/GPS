@@ -1,13 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react"; 
+import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { initMercadoPago, Wallet } from "@mercadopago/sdk-react";
 import { useCart } from "../context/CartContext";
 import { useChilexpressCoverage } from "../hooks/useChilexpressCoverage";
 import { useShippingQuote } from "../hooks/useShippingQuote";
 import ChilexpressRegionComunaSelector from "../components/ChilexpressRegionComunaSelector";
-import WalletComponent from './WalletComponent'; 
+import WalletComponent from "./WalletComponent";
+import { useFormValidation } from "../hooks/useFormValidation.js";
+import { ValidatedInput } from "./ValidatedInput.jsx";
+import toast, { Toaster } from "react-hot-toast";
 
 import {
   Heart,
@@ -20,10 +23,10 @@ import {
   Minus,
   Plus,
   X,
-  Clock, 
+  Clock,
 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:10000/api";
 const mpPublicKey = import.meta.env.VITE_MP_PUBLIC_KEY;
 initMercadoPago(mpPublicKey, { locale: "es-CL" });
 
@@ -186,21 +189,17 @@ const ShippingForm = ({
   servicioDescripcion,
   loadingEnvio,
   errorEnvio,
+  errors, 
+  onInputChange, 
+  onInputBlur, 
+  formatPhone, 
 }) => {
-  const handleInputChange = (field, value) => {
-    setShippingData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-semibold text-gray-900">
         Información de Envío
       </h3>
 
-      {/* Selector región y comuna con datos de Chilexpress */}
       <ChilexpressRegionComunaSelector
         regionValue={shippingData.regionCode}
         comunaValue={shippingData.comunaCode}
@@ -213,7 +212,6 @@ const ShippingForm = ({
         }}
       />
 
-      {/* Mensaje de cobertura */}
       {loadingCobertura && (
         <p className="text-amber-700 text-sm">Consultando cobertura...</p>
       )}
@@ -230,6 +228,7 @@ const ShippingForm = ({
           No hay cobertura en la comuna seleccionada.
         </p>
       )}
+
       <div className="bg-amber-50 p-3 rounded-lg">
         <h4 className="font-semibold text-amber-800 mb-2">Costo de Envío</h4>
 
@@ -241,9 +240,7 @@ const ShippingForm = ({
         )}
 
         {errorEnvio && (
-          <div className="text-red-600 text-sm">
-            ❌ Error: {errorEnvio}
-          </div>
+          <div className="text-red-600 text-sm">❌ Error: {errorEnvio}</div>
         )}
 
         {costoEnvio && !loadingEnvio && !errorEnvio && (
@@ -273,86 +270,79 @@ const ShippingForm = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Nombres *
-          </label>
-          <input
-            type="text"
-            value={shippingData.nombres}
-            onChange={(e) => handleInputChange("nombres", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-            placeholder="Tung Tung"
-          />
-        </div>
+        <ValidatedInput
+          label="Nombres"
+          name="nombres"
+          value={shippingData.nombres}
+          onChange={onInputChange}
+          onBlur={onInputBlur}
+          error={errors.nombres}
+          placeholder="Ej: Juan Carlos"
+          required
+          maxLength={50}
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Apellidos *
-          </label>
-          <input
-            type="text"
-            value={shippingData.apellidos}
-            onChange={(e) => handleInputChange("apellidos", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-            placeholder="Sahur"
-          />
-        </div>
+        <ValidatedInput
+          label="Apellidos"
+          name="apellidos"
+          value={shippingData.apellidos}
+          onChange={onInputChange}
+          onBlur={onInputBlur}
+          error={errors.apellidos}
+          placeholder="Ej: Pérez González"
+          required
+          maxLength={50}
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Email *
-          </label>
-          <input
-            type="email"
-            value={shippingData.email}
-            onChange={(e) => handleInputChange("email", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-            placeholder="correo@ejemplo.com"
-            required
-          />
-        </div>
+        <ValidatedInput
+          label="Email"
+          name="email"
+          type="email"
+          value={shippingData.email}
+          onChange={onInputChange}
+          onBlur={onInputBlur}
+          error={errors.email}
+          placeholder="ejemplo@gmail.com"
+          required
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Teléfono *
-          </label>
-          <input
-            type="tel"
-            value={shippingData.phone}
-            onChange={(e) => handleInputChange("phone", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-            placeholder="+56 9 1234 5678"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Dirección *
-        </label>
-        <input
-          type="text"
-          value={shippingData.address}
-          onChange={(e) => handleInputChange("address", e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-          placeholder="Av. Providencia 1234"
+        <ValidatedInput
+          label="Teléfono"
+          name="phone"
+          value={shippingData.phone}
+          onChange={onInputChange}
+          onBlur={onInputBlur}
+          error={errors.phone}
+          placeholder="+569XXXXXXXX"
+          required
+          autoFormat={true}
+          formatFunction={formatPhone}
         />
       </div>
 
+      <ValidatedInput
+        label="Dirección"
+        name="address"
+        value={shippingData.address}
+        onChange={onInputChange}
+        onBlur={onInputBlur}
+        error={errors.address}
+        placeholder="Av. Providencia 1234"
+        required
+        maxLength={255}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Código Postal
-          </label>
-          <input
-            type="text"
-            value={shippingData.postalCode}
-            onChange={(e) => handleInputChange("postalCode", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-            placeholder="7500000"
-          />
-        </div>
+        <ValidatedInput
+          label="Código Postal"
+          name="postalCode"
+          value={shippingData.postalCode}
+          onChange={onInputChange}
+          onBlur={onInputBlur}
+          error={errors.postalCode}
+          placeholder="7500000"
+          maxLength={7}
+        />
       </div>
 
       <div>
@@ -361,11 +351,18 @@ const ShippingForm = ({
         </label>
         <textarea
           value={shippingData.instructions}
-          onChange={(e) => handleInputChange("instructions", e.target.value)}
+          onChange={(e) => onInputChange("instructions", e.target.value)}
           rows={3}
+          maxLength={500}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
           placeholder="Ej: Dejar en portería, tocar timbre, etc."
         />
+        {errors.instructions && (
+          <p className="mt-1 text-sm text-red-600">{errors.instructions}</p>
+        )}
+        <p className="mt-1 text-xs text-gray-500 text-right">
+          {shippingData.instructions?.length || 0}/500
+        </p>
       </div>
     </div>
   );
@@ -389,7 +386,7 @@ const OrderSummary = ({
       <div className="space-y-3 mb-4">
         {cart.map((item) => (
           <div
-            key={item.id_producto} 
+            key={item.id_producto}
             className="flex justify-between items-center"
           >
             <div className="flex items-center gap-2">
@@ -466,8 +463,8 @@ function MultiStepCheckout() {
     removeItemFromCart,
     clearCart,
     total: totalCarrito,
-    incrementItemQuantity, 
-    decrementItemQuantity, 
+    incrementItemQuantity,
+    decrementItemQuantity,
   } = useCart();
 
   const navigate = useNavigate();
@@ -508,6 +505,9 @@ function MultiStepCheckout() {
     servicioDescripcion,
   } = useShippingQuote();
 
+  const { errors, validateForm, validateField, formatPhone, clearFieldError } =
+    useFormValidation();
+
   useEffect(() => {
     if (shippingData.regionCode && shippingData.comunaCode) {
       const regionNumber = shippingData.regionCode
@@ -539,13 +539,15 @@ function MultiStepCheckout() {
 
   useEffect(() => {
     let interval;
-    
+
     if (reservaActiva && tiempoRestante > 0) {
       interval = setInterval(() => {
         setTiempoRestante((prev) => {
           if (prev <= 1) {
             setReservaActiva(false);
-            setError("⏰ La reserva de stock ha expirado. Por favor, intenta nuevamente.");
+            setError(
+              "⏰ La reserva de stock ha expirado. Por favor, intenta nuevamente."
+            );
             return 0;
           }
           return prev - 1;
@@ -561,7 +563,7 @@ function MultiStepCheckout() {
   const formatTiempoRestante = (segundos) => {
     const minutos = Math.floor(segundos / 60);
     const segs = segundos % 60;
-    return `${minutos}:${segs.toString().padStart(2, '0')}`;
+    return `${minutos}:${segs.toString().padStart(2, "0")}`;
   };
 
   const steps = [
@@ -577,7 +579,7 @@ function MultiStepCheckout() {
     0
   );
 
-  const shipping = costoEnvio || 0; 
+  const shipping = costoEnvio || 0;
   const total = subtotal + shipping;
 
   const handleAddToFavorites = (itemId) => {
@@ -599,24 +601,46 @@ function MultiStepCheckout() {
     );
   };
 
+  const handleInputChange = (fieldName, value) => {
+    setShippingData((prev) => ({
+      ...prev,
+      [fieldName]: value,
+    }));
+
+    if (errors[fieldName]) {
+      clearFieldError(fieldName);
+    }
+  };
+
+  const handleInputBlur = (fieldName, value) => {
+    validateField(fieldName, value);
+  };
+
   const handleNextStep = () => {
-    if (currentStep === 0 && carrito.length === 0) {
-      setError("El carrito está vacío");
-      return;
+    if (currentStep === 1) {
+      const validation = validateForm(shippingData);
+
+      if (!validation.isValid) {
+        toast.error("Por favor, corrige los errores antes de continuar");
+
+        Object.entries(validation.errors).forEach(([field, message]) => {
+          if (message) {
+            toast.error(`${field}: ${message}`, { duration: 4000 });
+          }
+        });
+
+        return;
+      }
+
+      
+      if (cobertura !== true) {
+        toast.error("Selecciona una comuna con cobertura disponible");
+        return;
+      }
     }
 
-    if (currentStep === 1 && !validateShippingData()) {
-      setError("Por favor completa todos los campos obligatorios");
-      return;
-    }
-
-    if (currentStep === 1 && cobertura === false) {
-      setError("No hay cobertura de Chilexpress para la comuna seleccionada");
-      return;
-    }
-
-    setError(null);
-    setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
+    setCurrentStep((prev) => prev + 1);
+    toast.success("¡Información validada correctamente!");
   };
 
   const handlePrevStep = () => {
@@ -631,13 +655,13 @@ function MultiStepCheckout() {
     try {
       const externalReference = `ORD-${Date.now()}`;
       setExternalReferenceActual(externalReference);
-      
+
       const productos = carrito.map((item) => ({
         id_producto: item.id_producto,
         quantity: item.cantidad || 1,
       }));
 
-      console.log('🔒 Creando reserva de stock...');
+      console.log("🔒 Creando reserva de stock...");
       const reservaResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/reserva-stock/crear`,
         {
@@ -652,12 +676,12 @@ function MultiStepCheckout() {
 
       if (!reservaResponse.ok) {
         const errorData = await reservaResponse.json();
-        throw new Error(errorData.message || 'Error al reservar stock');
+        throw new Error(errorData.message || "Error al reservar stock");
       }
 
       const reservaData = await reservaResponse.json();
-      console.log('✅ Stock reservado exitosamente:', reservaData);
-      
+      console.log("✅ Stock reservado exitosamente:", reservaData);
+
       setReservaActiva(true);
       setTiempoRestante(15 * 60);
 
@@ -668,7 +692,7 @@ function MultiStepCheckout() {
         quantity: item.cantidad || 1,
       }));
 
-      console.log('💳 Creando preferencia de pago...');
+      console.log("💳 Creando preferencia de pago...");
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/payments/create_preference`,
         {
@@ -683,28 +707,24 @@ function MultiStepCheckout() {
       );
 
       if (!response.ok) {
-        console.warn('❌ Error al crear preferencia, cancelando reserva...');
-        await fetch(
-          `${import.meta.env.VITE_API_URL}/reserva-stock/cancelar`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              external_reference: externalReference,
-            }),
-          }
-        ).catch(err => console.error('Error al cancelar reserva:', err));
-        
+        console.warn("❌ Error al crear preferencia, cancelando reserva...");
+        await fetch(`${import.meta.env.VITE_API_URL}/reserva-stock/cancelar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            external_reference: externalReference,
+          }),
+        }).catch((err) => console.error("Error al cancelar reserva:", err));
+
         setReservaActiva(false);
         setTiempoRestante(null);
-        throw new Error('Error al crear preferencia de pago');
+        throw new Error("Error al crear preferencia de pago");
       }
 
       const data = await response.json();
       setPreferenceId(data.preferenceId || data.id);
-      
-      console.log('🚀 Preferencia creada, redirigiendo a MercadoPago...');
 
+      console.log("🚀 Preferencia creada, redirigiendo a MercadoPago...");
     } catch (err) {
       console.error("Checkout error:", err);
       setError(err.message || "Error al procesar el pago. Intenta nuevamente.");
@@ -737,6 +757,7 @@ function MultiStepCheckout() {
                 <Link
                   to="/"
                   className="inline-flex px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
+                  style={{ color: "white" }}
                 >
                   Continuar Comprando
                 </Link>
@@ -745,19 +766,20 @@ function MultiStepCheckout() {
               <div className="space-y-4">
                 {carrito.map((item) => (
                   <CartItem
-                    key={item.id_producto} 
+                    key={item.id_producto}
                     title={item.nombre}
                     price={Number(item.precio.toString().replace(/\./g, ""))}
                     quantity={item.cantidad || 1}
                     image={item.imagen}
-                    onRemove={() => removeItemFromCart(item)} 
-                    onAddToFavorites={() => handleAddToFavorites(item.id_producto)}
+                    onRemove={() => removeItemFromCart(item)}
+                    onAddToFavorites={() =>
+                      handleAddToFavorites(item.id_producto)
+                    }
                     onIncrease={() => incrementItemQuantity(item.id_producto)}
-                    onDecrease={() => decrementItemQuantity(item.id_producto)} 
+                    onDecrease={() => decrementItemQuantity(item.id_producto)}
                   />
                 ))}
 
-                {/* Resumen del carrito */}
                 <div className="bg-amber-50 border-amber-200 border rounded-lg">
                   <div className="p-4">
                     <div className="space-y-2">
@@ -804,6 +826,10 @@ function MultiStepCheckout() {
             servicioDescripcion={servicioDescripcion}
             loadingEnvio={loadingEnvio}
             errorEnvio={errorEnvio}
+            errors={errors} 
+            onInputChange={handleInputChange} 
+            onInputBlur={handleInputBlur} 
+            formatPhone={formatPhone} 
           />
         );
 
@@ -814,7 +840,6 @@ function MultiStepCheckout() {
               Confirma tu Pedido
             </h3>
 
-            {/* ✅ MOSTRAR ALERTA DE RESERVA ACTIVA */}
             {reservaActiva && tiempoRestante && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <div className="flex items-center">
@@ -824,7 +849,10 @@ function MultiStepCheckout() {
                       🔒 Stock reservado temporalmente
                     </p>
                     <p className="text-amber-600 text-sm">
-                      Tiempo restante: <span className="font-mono font-bold">{formatTiempoRestante(tiempoRestante)}</span>
+                      Tiempo restante:{" "}
+                      <span className="font-mono font-bold">
+                        {formatTiempoRestante(tiempoRestante)}
+                      </span>
                     </p>
                     <p className="text-amber-500 text-xs mt-1">
                       Complete el pago antes de que expire la reserva
@@ -885,12 +913,7 @@ function MultiStepCheckout() {
               </div>
             </div>
 
-            {/* ✅ USAR EL WALLET COMPONENT MEMOIZADO */}
-            {walletComponent && (
-              <div className="mt-6">
-                {walletComponent}
-              </div>
-            )}
+            {walletComponent && <div className="mt-6">{walletComponent}</div>}
           </div>
         );
 
@@ -909,12 +932,11 @@ function MultiStepCheckout() {
 
   const walletComponent = useMemo(() => {
     if (!preferenceId) return null;
-    
+
     return (
       <WalletComponent
         preferenceId={preferenceId}
-        onReady={() => {
-        }}
+        onReady={() => {}}
         onError={(error) => {
           setError("Error al cargar el botón de pago.");
         }}
@@ -924,8 +946,33 @@ function MultiStepCheckout() {
 
   return (
     <section className="min-h-screen min-w-screen bg-white py-8 md:py-16">
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: "#FEF3C7",
+            color: "#92400E",
+            border: "1px solid #F59E0B",
+          },
+          success: {
+            style: {
+              background: "#D1FAE5",
+              color: "#065F46",
+              border: "1px solid #10B981",
+            },
+          },
+          error: {
+            style: {
+              background: "#FEE2E2",
+              color: "#991B1B",
+              border: "1px solid #EF4444",
+            },
+          },
+        }}
+      />
+
       <div className="mx-auto max-w-7xl px-4">
-        {/* Header */}
         <div className="relative mb-8">
           <button
             type="button"
@@ -944,11 +991,9 @@ function MultiStepCheckout() {
           </p>
         </div>
 
-        {/* Step Indicator */}
         <StepIndicator currentStep={currentStep} steps={steps} />
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-sm p-6">
               {renderStepContent()}
@@ -959,7 +1004,6 @@ function MultiStepCheckout() {
                 </div>
               )}
 
-              {/* Navigation Buttons */}
               {carrito.length > 0 && (
                 <div className="flex justify-between pt-4 mt-8 border-t">
                   <Link
@@ -1009,7 +1053,6 @@ function MultiStepCheckout() {
             </div>
           </div>
 
-          {/* Order Summary */}
           <div className="lg:col-span-1">
             <OrderSummary
               cart={carrito}

@@ -5,32 +5,157 @@ import { CompraTemporalService } from "../services/compraTemporal.service.js";
 import { FRONTEND_URL } from '../config/configENV.js';
 import crypto from 'crypto';
 import { reservaStockService } from '../services/reservaStockMemoria.service.js';
+// ✅ NUEVO: Importar validaciones
+import { checkoutFormValidation } from '../validations/form.validation.js';
 
 const preference = new Preference(mercadoPagoClient);
 const compraTemporalService = new CompraTemporalService();
 
 export const createPreference = async (req, res) => {
   try {
-    const { items, external_reference, shipping_info } = req.body;
+    const { items, external_reference, shipping_info, datosPersonales } = req.body;
 
-    await compraTemporalService.saveCompraTemporal(external_reference, items, shipping_info);
+    console.log('🔍 Datos recibidos en createPreference:', {
+      items: items?.length || 0,
+      external_reference,
+      shipping_info: !!shipping_info,
+      datosPersonales: !!datosPersonales
+    });
+
+    // ✅ NUEVO: Validar datos personales si están presentes
+    if (datosPersonales) {
+      console.log('🔧 Validando datos personales:', datosPersonales);
+      
+      const { error } = checkoutFormValidation.validate(datosPersonales);
+      
+      if (error) {
+        console.error('❌ Errores de validación:', error.details);
+        
+        return res.status(400).json({
+          status: 'Error',
+          message: 'Datos del formulario inválidos',
+          errors: error.details.map(detail => ({
+            field: detail.context.key,
+            message: detail.message,
+            value: detail.context.value
+          })),
+          code: 'VALIDATION_ERROR'
+        });
+      }
+      
+      console.log('✅ Datos personales validados correctamente');
+    }
+
+    // ✅ NUEVO: Validar items
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        status: 'Error',
+        message: 'Items de compra son requeridos',
+        code: 'MISSING_ITEMS'
+      });
+    }
+
+    // ✅ NUEVO: Validar external_reference
+    if (!external_reference) {
+      return res.status(400).json({
+        status: 'Error',
+        message: 'Referencia externa es requerida',
+        code: 'MISSING_REFERENCE'
+      });
+    }
+
+    // ✅ Guardar compra temporal (con datos validados)
+    await compraTemporalService.saveCompraTemporal(
+      external_reference, 
+      items, 
+      shipping_info,
+      datosPersonales // ✅ Incluir datos personales validados
+    );
+
+    // ✅ NUEVO: Configurar tiempo límite para la preferencia
+    const expiration = new Date();
+    expiration.setMinutes(expiration.getMinutes() + 15); // 15 minutos
 
     const body = {
       items,
       external_reference,
       auto_return: "approved",
+      
+      // ✅ NUEVO: Configurar expiración
+      expires: true,
+      expiration_date_from: new Date().toISOString(),
+      expiration_date_to: expiration.toISOString(),
+      
       back_urls: {
         success: `${FRONTEND_URL}/success`,
         failure: `${FRONTEND_URL}/failure`,
         pending: `${FRONTEND_URL}/pending`
       },
+      
+      // ✅ NUEVO: Agregar metadatos para debugging
+      metadata: {
+        reserva_id: external_reference,
+        fecha_creacion: new Date().toISOString(),
+        tiempo_limite_minutos: 15,
+        datos_validados: !!datosPersonales
+      },
+
+      // ✅ NUEVO: Información del comprador si está disponible
+      ...(datosPersonales && {
+        payer: {
+          name: datosPersonales.nombres,
+          surname: datosPersonales.apellidos,
+          email: datosPersonales.email,
+          phone: {
+            number: datosPersonales.phone?.replace('+56', '') || ''
+          },
+          address: {
+            street_name: datosPersonales.address || '',
+            zip_code: datosPersonales.postalCode || ''
+          }
+        }
+      })
     };
 
+    console.log('📨 Creando preferencia con body:', JSON.stringify(body, null, 2));
+
     const response = await preference.create({ body });
-    res.status(200).json({ id: response.id });
+    
+    console.log('✅ Preferencia creada exitosamente:', response.id);
+    
+    res.status(200).json({ 
+      id: response.id,
+      expiration: expiration.toISOString(),
+      timeLimit: 15 // minutos
+    });
+
   } catch (error) {
-    console.error('Error al crear preferencia:', error);
-    res.status(500).json({ error: error.message });
+    console.error('❌ Error al crear preferencia:', error);
+    
+    // ✅ NUEVO: Manejo de errores más específico
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        status: 'Error',
+        message: 'Error de validación',
+        error: error.message,
+        code: 'VALIDATION_ERROR'
+      });
+    }
+    
+    if (error.message.includes('MercadoPago')) {
+      return res.status(502).json({
+        status: 'Error',
+        message: 'Error del servicio de pagos',
+        code: 'PAYMENT_SERVICE_ERROR'
+      });
+    }
+    
+    res.status(500).json({ 
+      status: 'Error',
+      message: 'Error interno del servidor',
+      error: error.message,
+      code: 'INTERNAL_ERROR'
+    });
   }
 };
 
@@ -66,7 +191,7 @@ export const handleWebhook = async (req, res) => {
       console.warn('[Sandbox] Ignorando validación de firma de webhook');
     }
 
-    console.log('Webhook recibido:', JSON.stringify(event, null, 2));
+    console.log('📨 Webhook recibido:', JSON.stringify(event, null, 2));
 
     if (event.type === 'payment') {
       const paymentId = event.data.id;
@@ -74,6 +199,32 @@ export const handleWebhook = async (req, res) => {
 
       try {
         const paymentData = await payment.get({ id: paymentId });
+
+        // ✅ NUEVO: Validar tiempo límite de la transacción
+        const tiempoLimite = 15; // minutos
+        const ahora = new Date();
+        const timestampPago = new Date(paymentData.date_created);
+        const diferenciaMinutos = (ahora - timestampPago) / (1000 * 60);
+
+        console.log(`⏰ Validando tiempo: ${diferenciaMinutos.toFixed(1)} min vs ${tiempoLimite} min límite`);
+
+        if (diferenciaMinutos > tiempoLimite) {
+          console.log(`❌ Pago rechazado por tiempo: ${diferenciaMinutos.toFixed(1)} min > ${tiempoLimite} min`);
+          
+          // Liberar reserva si existe
+          if (paymentData.external_reference) {
+            const resultado = await reservaStockService.cancelarReserva(
+              paymentData.external_reference, 
+              'tiempo_expirado'
+            );
+            console.log('🔓 Reserva liberada por tiempo expirado:', resultado);
+          }
+          
+          return res.status(400).json({ 
+            error: `Transacción expirada. Tiempo límite: ${tiempoLimite} minutos.`,
+            code: 'TRANSACTION_EXPIRED'
+          });
+        }
 
         const transactionData = {
           payment_id: paymentData.id,
@@ -83,22 +234,45 @@ export const handleWebhook = async (req, res) => {
           payment_type: paymentData.payment_type_id,
           merchant_order_id: paymentData.order?.id || 'N/A',
           preference_id: paymentData.preference_id || 'N/A',
-          email: paymentData.payer?.email || "" 
+          email: paymentData.payer?.email || "",
+          date_created: paymentData.date_created,
+          processing_time: diferenciaMinutos.toFixed(1) // ✅ NUEVO: Registro del tiempo
         };
 
         if (transactionData.status === 'approved') {
           console.log('💰 Pago aprobado, confirmando reserva...');
+          
+          // ✅ NUEVO: Verificar que la reserva siga activa
+          const reservaActiva = await reservaStockService.verificarReservaActiva(
+            transactionData.external_reference
+          );
+          
+          if (!reservaActiva) {
+            console.error('❌ Reserva no encontrada o expirada:', transactionData.external_reference);
+            return res.status(400).json({
+              error: 'La reserva de stock ha expirado',
+              code: 'RESERVATION_EXPIRED'
+            });
+          }
+          
           const resultado = await reservaStockService.confirmarReserva(transactionData.external_reference);
           
           if (resultado.success) {
             console.log('✅ Stock confirmado para:', transactionData.external_reference);
           } else {
             console.error('❌ Error al confirmar stock:', resultado.error);
+            return res.status(500).json({
+              error: 'Error al confirmar stock',
+              details: resultado.error
+            });
           }
           
         } else if (transactionData.status === 'rejected' || transactionData.status === 'cancelled') {
           console.log('❌ Pago rechazado/cancelado, liberando reserva...');
-          const resultado = await reservaStockService.cancelarReserva(transactionData.external_reference, 'cancelado');
+          const resultado = await reservaStockService.cancelarReserva(
+            transactionData.external_reference, 
+            'pago_' + transactionData.status
+          );
           
           if (resultado.success) {
             console.log('🔓 Stock liberado para:', transactionData.external_reference);
@@ -111,19 +285,38 @@ export const handleWebhook = async (req, res) => {
         const productos = temporalData ? temporalData.productos : [];
         const datosPersonales = temporalData ? temporalData.datosPersonales : {};
 
+        // ✅ NUEVO: Validar datos personales antes de guardar
+        if (datosPersonales && Object.keys(datosPersonales).length > 0) {
+          const { error } = checkoutFormValidation.validate(datosPersonales);
+          
+          if (error) {
+            console.warn('⚠️ Datos personales inválidos en webhook, continuando sin validación estricta');
+            console.log('Errores encontrados:', error.details.map(d => d.message));
+            // No bloquear el proceso, solo log de advertencia
+          } else {
+            console.log('✅ Datos personales válidos en webhook');
+          }
+        }
+
         const paymentService = new PaymentService();
         await paymentService.saveTransaction(transactionData, productos, datosPersonales);
 
         await compraTemporalService.deleteCompraTemporal(transactionData.external_reference);
 
+        console.log('✅ Webhook procesado exitosamente');
+
       } catch (error) {
-        console.error('Error obteniendo datos de pago:', error);
+        console.error('❌ Error obteniendo datos de pago:', error);
+        return res.status(500).json({
+          error: 'Error procesando webhook',
+          details: error.message
+        });
       }
     }
 
     res.status(200).send();
   } catch (error) {
-    console.error('Error en webhook:', error);
+    console.error('❌ Error en webhook:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -136,20 +329,29 @@ export const getTransaction = async (req, res) => {
     console.log('Payment ID recibido:', paymentId);
     console.log('Timestamp:', new Date().toISOString());
 
+    // ✅ NUEVO: Validar formato del payment ID
+    if (!paymentId || !/^\d+$/.test(paymentId)) {
+      return res.status(400).json({
+        error: 'ID de pago inválido',
+        code: 'INVALID_PAYMENT_ID',
+        payment_id: paymentId
+      });
+    }
+
     const paymentService = new PaymentService();
     let transaction = await paymentService.getTransactionByPaymentId(paymentId);
 
     if (transaction) {
-      console.log('Compra encontrada en BD:', transaction);
+      console.log('✅ Compra encontrada en BD:', transaction);
       return res.status(200).json(transaction);
     }
 
-    console.log('No encontrado en BD, consultando MercadoPago...');
+    console.log('🔍 No encontrado en BD, consultando MercadoPago...');
     const payment = new Payment(mercadoPagoClient);
     const paymentData = await payment.get({ id: paymentId });
 
     if (paymentData) {
-      console.log('Pago encontrado en MercadoPago:', paymentData);
+      console.log('✅ Pago encontrado en MercadoPago:', paymentData);
 
       const formattedTransaction = {
         payment_id: paymentData.id,
@@ -164,22 +366,35 @@ export const getTransaction = async (req, res) => {
         site_id: paymentData.site_id
       };
 
-      console.log('Respuesta formateada:', formattedTransaction);
+      console.log('📤 Respuesta formateada:', formattedTransaction);
       return res.status(200).json(formattedTransaction);
     }
 
-    console.log('No se encontró el pago en MercadoPago');
+    console.log('❌ No se encontró el pago en MercadoPago');
     return res.status(404).json({
       error: 'Compra no encontrada',
-      payment_id: paymentId
+      payment_id: paymentId,
+      code: 'PAYMENT_NOT_FOUND'
     });
 
   } catch (error) {
-    console.error('Error al obtener compra:', error);
+    console.error('❌ Error al obtener compra:', error);
+    
+    // ✅ NUEVO: Manejo de errores específicos
+    if (error.message.includes('Invalid payment_id')) {
+      return res.status(400).json({
+        error: 'ID de pago inválido',
+        message: error.message,
+        payment_id: req.params.paymentId,
+        code: 'INVALID_PAYMENT_ID'
+      });
+    }
+    
     res.status(500).json({
       error: 'Error interno del servidor',
       message: error.message,
-      payment_id: req.params.paymentId
+      payment_id: req.params.paymentId,
+      code: 'INTERNAL_ERROR'
     });
   }
 };

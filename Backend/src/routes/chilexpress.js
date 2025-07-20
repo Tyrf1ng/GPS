@@ -259,7 +259,7 @@ router.post("/cotizar", async (req, res) => {
         const url = `${baseUrl}/rating/api/v1.0/rates/courier`;
         
         const requestBody = {
-            originCountyCode: "LOAL",
+            originCountyCode: "ALAM",
             destinationCountyCode: destinationCountyCode,
             package: {
                 weight: packageInfo.weight.toString(),

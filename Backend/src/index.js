@@ -33,6 +33,7 @@ import minioRutes from "./routes/minio.routes.js";
 import valoracionesRoutes from './routes/valoraciones.routes.js';
 import { minioClient } from './config/configMinio.js';
 import shippingRoutes from "../src/routes/shipping.routes.js";
+import reservaStockRoutes from './routes/reservaStock.routes.js';
 
 async function setupServer() {
   try {

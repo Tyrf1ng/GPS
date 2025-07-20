@@ -19,26 +19,27 @@ import {
 } from "./config/configENV.js";
 import { connectDB } from "./config/configDB.js";
 
-import { createProductos, createUser, createCategoria, createValoraciones, createCompra_Producto, createEnvios, createCompras} from "./config/initialSetup.js";
+import { createProductos, createUser, createCategoria, createValoraciones, createCompra_Producto, createEnvios, createCompras } from "./config/initialSetup.js";
 import { passportJwtSetup } from "./auth/passport.auth.js";
 import path from "path";
 import dotenv from 'dotenv';
 import paymentRoutes from './routes/payment.routes.js';
 import bodyParser from 'body-parser';
-import { handleWebhook } from './controller/payment.controller.js'; 
-import chilexpressRoutes from './routes/chilexpress.js'; 
+import { handleWebhook } from './controller/payment.controller.js';
+import chilexpressRoutes from './routes/chilexpress.js';
 import productosRoutes from "./routes/productos.routes.js";
 import categoriasRoutes from "./routes/categorias.routes.js";
 import minioRutes from "./routes/minio.routes.js";
 import valoracionesRoutes from './routes/valoraciones.routes.js';
 import { minioClient } from './config/configMinio.js';
+import shippingRoutes from "../src/routes/shipping.routes.js";
 
 async function setupServer() {
   try {
     dotenv.config();
     const app = express();
 
-    
+
     const PgStore = pgSession(session);
     const sessionStore = new PgStore({
       conObject: {
@@ -49,7 +50,7 @@ async function setupServer() {
       tableName: 'session',
     });
 
-    
+
     app.post(
       '/api/payments/webhook',
       bodyParser.raw({ type: 'application/json' }),
@@ -66,7 +67,7 @@ async function setupServer() {
         console.log('Método:', req.method);
         console.log('URL:', req.originalUrl);
         console.log('Headers:', req.headers);
-       
+
         console.log('Raw Body (utf8):', req.rawBody);
         console.log('Raw Body (hex):', Buffer.from(req.rawBody).toString('hex'));
         console.log('Raw Body (bytes):', Buffer.from(req.rawBody));
@@ -76,10 +77,10 @@ async function setupServer() {
       handleWebhook
     );
 
-    
+
     app.disable("x-powered-by");
 
-   
+
     const allowedOrigins = [
       'http://localhost:5173',
       'https://eccomerce-tyrf1ngs-projects.vercel.app',
@@ -106,14 +107,14 @@ async function setupServer() {
       next();
     });
 
-    
+
     app.use(urlencoded({ extended: true, limit: "1mb" }));
     app.use(json({ limit: "1mb" }));
 
     app.use(cookieParser());
     app.use(morgan("dev"));
 
-    
+
     const sessionMiddleware = session({
       secret: process.env.SESSION_SECRET || cookieKey,
       store: sessionStore,
@@ -131,22 +132,21 @@ async function setupServer() {
       sessionMiddleware(req, res, next);
     });
 
-    // Passport
     app.use(passport.initialize());
     app.use(passport.session());
     passportJwtSetup();
 
 
     app.use("/api", indexRoutes);
-    
+
     app.use('/api/payments', paymentRoutes);
     app.use('/api/chilexpress', chilexpressRoutes);
-    
+
     app.use("/api/productos", productosRoutes);
     app.use("/api/categorias", categoriasRoutes);
     app.use("/api/valoraciones", valoracionesRoutes);
     app.use("/api/minio", minioRutes);
-
+    app.use("/api/shipping", shippingRoutes);
 
     app.get('/api/minio/test', (req, res) => {
       minioClient.listBuckets((err, buckets) => {
@@ -157,7 +157,7 @@ async function setupServer() {
       });
     });
 
-   
+
     app.get("/", (req, res) => {
       res.send("Backend funcionando correctamente");
     });

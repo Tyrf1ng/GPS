@@ -21,10 +21,24 @@ const CardCatalogo = ({ producto, onAddToCart, viewMode = "grid" }) => {
   const stockStatus = getStockStatus(producto.stock)
   const categoryColor = getCategoryColor(producto.categoria)
 
-  const handleAddToCart = () => {
-    if (stockStatus.available) {
-      onAddToCart(producto)
-    }
+  const handleAddToCart = (e, producto) => {
+    e.stopPropagation();
+    
+    const item = {
+      id_producto: producto.id_producto || producto.id,
+      nombre: producto.nombre,
+      precio: producto.precio,
+      cantidad: 1,
+      imagen: producto.imagen,
+      categoria: producto.categoria,
+      stock: producto.stock,
+      peso: producto.peso,
+      ancho: producto.ancho,
+      alto: producto.alto,
+      profundidad: producto.profundidad,
+    };
+    
+    onAddToCart(item)
   }
 
   if (viewMode === "list") {
@@ -77,7 +91,7 @@ const CardCatalogo = ({ producto, onAddToCart, viewMode = "grid" }) => {
               <div className="text-3xl font-bold text-[#a47148]">${producto.precio.toLocaleString()} CLP</div>
 
               <button
-                onClick={handleAddToCart}
+                onClick={(e) => handleAddToCart(e, producto)}
                 disabled={!stockStatus.available}
                 className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-200 ${
                   stockStatus.available
@@ -161,7 +175,7 @@ const CardCatalogo = ({ producto, onAddToCart, viewMode = "grid" }) => {
           </div>
 
           <button
-            onClick={handleAddToCart}
+            onClick={(e) => handleAddToCart(e, producto)}
             disabled={!stockStatus.available}
             className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-semibold transition-all duration-200 ${
               stockStatus.available

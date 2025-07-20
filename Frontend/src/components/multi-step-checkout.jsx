@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { initMercadoPago, Wallet } from "@mercadopago/sdk-react";
 import { useCart } from "../context/CartContext";
 import { useChilexpressCoverage } from "../hooks/useChilexpressCoverage";
+import { useShippingQuote } from "../hooks/useShippingQuote";
 import ChilexpressRegionComunaSelector from "../components/ChilexpressRegionComunaSelector";
 
 import {
@@ -24,7 +25,6 @@ const API_URL = import.meta.env.VITE_BASE_URL || "http://localhost:3000/api";
 const mpPublicKey = import.meta.env.VITE_MP_PUBLIC_KEY;
 initMercadoPago(mpPublicKey, { locale: "es-CL" });
 
-// Función para formatear precios
 const formatPrice = (price) => {
   return new Intl.NumberFormat("es-CL").format(price);
 };
@@ -80,7 +80,6 @@ const CartItem = ({
   const isPlusDisabled = quantity >= 10 || readonly;
 
   if (readonly) {
-    // Mantener el diseño actual para el modo readonly
     return (
       <div className="rounded-lg border border-orange-200 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-4">
@@ -181,6 +180,10 @@ const ShippingForm = ({
   cobertura,
   loadingCobertura,
   errorCobertura,
+  costoEnvio,
+  servicioDescripcion,
+  loadingEnvio,
+  errorEnvio,
 }) => {
   const handleInputChange = (field, value) => {
     setShippingData((prev) => ({
@@ -225,6 +228,47 @@ const ShippingForm = ({
           No hay cobertura en la comuna seleccionada.
         </p>
       )}
+      <div className="bg-amber-50 p-3 rounded-lg">
+        <h4 className="font-semibold text-amber-800 mb-2">Costo de Envío</h4>
+
+        {loadingEnvio && (
+          <div className="flex items-center text-amber-600">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-600 mr-2"></div>
+            Calculando costo de envío...
+          </div>
+        )}
+
+        {errorEnvio && (
+          <div className="text-red-600 text-sm">
+            ❌ Error: {errorEnvio}
+          </div>
+        )}
+
+        {costoEnvio && !loadingEnvio && !errorEnvio && (
+          <div className="space-y-1">
+            <div className="flex justify-between items-center">
+              <span className="text-amber-700">Costo estimado:</span>
+              <span className="font-bold text-amber-800 text-lg">
+                ${formatPrice(costoEnvio)}
+              </span>
+            </div>
+            {servicioDescripcion && (
+              <div className="text-sm text-amber-600">
+                Servicio: {servicioDescripcion}
+              </div>
+            )}
+            <div className="text-xs text-amber-500 mt-1">
+              ⏱️ Tiempo estimado: 3-5 días hábiles
+            </div>
+          </div>
+        )}
+
+        {!costoEnvio && !loadingEnvio && !errorEnvio && cobertura === true && (
+          <div className="text-amber-600 text-sm">
+            💡 El costo se calculará automáticamente
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -325,7 +369,15 @@ const ShippingForm = ({
   );
 };
 
-const OrderSummary = ({ cart, shippingData, subtotal, shipping, total }) => {
+const OrderSummary = ({
+  cart,
+  shippingData,
+  subtotal,
+  shipping,
+  total,
+  loadingEnvio,
+  servicioDescripcion,
+}) => {
   return (
     <div className="bg-gray-50 rounded-lg p-6">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -362,11 +414,25 @@ const OrderSummary = ({ cart, shippingData, subtotal, shipping, total }) => {
         </div>
         <div className="flex justify-between">
           <span className="text-gray-600">Envío:</span>
-          <span>${formatPrice(shipping)}</span>
+          <span>
+            {loadingEnvio
+              ? "Calculando..."
+              : shipping > 0
+              ? `$${formatPrice(shipping)}`
+              : "A calcular"}
+          </span>
         </div>
+        {servicioDescripcion && (
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>Servicio:</span>
+            <span>{servicioDescripcion}</span>
+          </div>
+        )}
         <div className="flex justify-between font-bold text-lg border-t pt-2">
           <span>Total:</span>
-          <span className="text-amber-600">${formatPrice(total)}</span>
+          <span className="text-amber-600">
+            {loadingEnvio ? "Calculando..." : `$${formatPrice(total)}`}
+          </span>
         </div>
       </div>
 
@@ -376,7 +442,9 @@ const OrderSummary = ({ cart, shippingData, subtotal, shipping, total }) => {
             Envío estimado: 3-5 días hábiles
           </p>
           <div className="text-sm text-gray-600">
-            <p>{shippingData.nombres} {shippingData.apellidos}</p>
+            <p>
+              {shippingData.nombres} {shippingData.apellidos}
+            </p>
             <p>{shippingData.address}</p>
             <p>
               {shippingData.comunaCode}, {shippingData.regionCode}
@@ -416,7 +484,6 @@ function MultiStepCheckout() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Chilexpress coverage hook
   const {
     loading: loadingCobertura,
     error: errorCobertura,
@@ -424,10 +491,17 @@ function MultiStepCheckout() {
     checkCobertura,
   } = useChilexpressCoverage();
 
-  // Consultar cobertura cada vez que cambian región o comuna (y ambos existen)
+  const {
+    cotizarEnvio,
+    resetQuote,
+    loading: loadingEnvio,
+    error: errorEnvio,
+    costoEnvio,
+    servicioDescripcion,
+  } = useShippingQuote();
+
   useEffect(() => {
     if (shippingData.regionCode && shippingData.comunaCode) {
-      // Convertir regionId de Chilexpress a número
       const regionNumber = shippingData.regionCode
         .replace("R", "")
         .replace("M", "13");
@@ -435,13 +509,32 @@ function MultiStepCheckout() {
     }
   }, [shippingData.regionCode, shippingData.comunaCode]);
 
+  useEffect(() => {
+    if (
+      shippingData.regionCode &&
+      shippingData.comunaCode &&
+      cobertura === true &&
+      carrito.length > 0
+    ) {
+      cotizarEnvio(carrito, shippingData.comunaCode);
+    } else {
+      resetQuote();
+    }
+  }, [
+    shippingData.regionCode,
+    shippingData.comunaCode,
+    cobertura,
+    carrito,
+    cotizarEnvio,
+    resetQuote,
+  ]);
+
   const steps = [
     { label: "Carrito", icon: <Package className="w-5 h-5" /> },
     { label: "Información de Envío", icon: <MapPin className="w-5 h-5" /> },
     { label: "Confirmación", icon: <Check className="w-5 h-5" /> },
   ];
 
-  // Calcular totales
   const subtotal = carrito.reduce(
     (total, item) =>
       total +
@@ -449,7 +542,7 @@ function MultiStepCheckout() {
     0
   );
 
-  const shipping = 3000;
+  const shipping = costoEnvio || 0; 
   const total = subtotal + shipping;
 
   const handleAddToFavorites = (itemId) => {
@@ -482,7 +575,6 @@ function MultiStepCheckout() {
       return;
     }
 
-    // Solo permite avanzar si hay cobertura
     if (currentStep === 1 && cobertura === false) {
       setError("No hay cobertura de Chilexpress para la comuna seleccionada");
       return;
@@ -619,6 +711,10 @@ function MultiStepCheckout() {
             cobertura={cobertura}
             loadingCobertura={loadingCobertura}
             errorCobertura={errorCobertura}
+            costoEnvio={costoEnvio}
+            servicioDescripcion={servicioDescripcion}
+            loadingEnvio={loadingEnvio}
+            errorEnvio={errorEnvio}
           />
         );
 
@@ -704,7 +800,6 @@ function MultiStepCheckout() {
     }
   };
 
-  // Botón "Volver" con lógica de pasos
   const handleHeaderBack = () => {
     if (currentStep === 0) {
       navigate("/");
@@ -808,6 +903,8 @@ function MultiStepCheckout() {
               subtotal={subtotal}
               shipping={shipping}
               total={total}
+              loadingEnvio={loadingEnvio}
+              servicioDescripcion={servicioDescripcion}
             />
           </div>
         </div>

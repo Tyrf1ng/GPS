@@ -10,7 +10,6 @@ const CatalogoConnected = () => {
   const { productos, loading, error } = useProductos()
   const { addItemToCart } = useCart()
 
-  // Estados para filtros y búsqueda
   const [searchTerm, setSearchTerm] = useState("")
   const [sortBy, setSortBy] = useState("nombre")
   const [sortOrder, setSortOrder] = useState("asc")
@@ -19,7 +18,6 @@ const CatalogoConnected = () => {
   const [showFilters, setShowFilters] = useState(false)
   const [addedToCart, setAddedToCart] = useState(null)
 
-  // Filtrar y ordenar productos
   const filteredAndSortedProducts = useMemo(() => {
     if (!productos) return []
 
@@ -31,7 +29,6 @@ const CatalogoConnected = () => {
       return matchesSearch && matchesPrice
     })
 
-    // Ordenar
     filtered.sort((a, b) => {
       let aValue = a[sortBy]
       let bValue = b[sortBy]
@@ -51,29 +48,14 @@ const CatalogoConnected = () => {
     return filtered
   }, [productos, searchTerm, sortBy, sortOrder, priceRange])
 
-  const handleAddToCart = (producto) => {
-    // CORRECCIÓN: Normalizar la estructura del producto antes de agregarlo
-    const itemToAdd = {
-      id_producto: producto.id_producto,
-      nombre: producto.nombre,
-      precio: producto.precio,
-      imagen: producto.imagen,
-      categoria: producto.categoria,
-      stock: producto.stock,
-      // No incluir cantidad aquí, el reducer la manejará
-    }
+  const handleAddToCart = (item) => {
+    addItemToCart(item)
 
-    addItemToCart(itemToAdd)
-    setAddedToCart(producto.id_producto)
-    console.log(`Producto ${producto.nombre} agregado al carrito`)
-
-    // Remover el feedback después de 2 segundos
     setTimeout(() => {
       setAddedToCart(null)
     }, 2000)
   }
 
-  // Componente de Loading Skeleton
   const ProductSkeleton = () => (
     <div className="bg-white rounded-2xl shadow-lg overflow-hidden animate-pulse">
       <div className="h-64 bg-gray-200"></div>
@@ -85,7 +67,6 @@ const CatalogoConnected = () => {
     </div>
   )
 
-  // Mostrar error
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center">
@@ -267,7 +248,6 @@ const CatalogoConnected = () => {
           )}
         </div>
 
-        {/* Productos */}
         <div className="mb-8">
           {loading ? (
             <div

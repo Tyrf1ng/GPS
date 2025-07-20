@@ -2,8 +2,8 @@ import express from "express";
 const router = express.Router();
 
 const CHILEXPRESS_KEY = process.env.CHILEXPRESS_API_KEY;
+const CHILEXPRESS_RATING_KEY = process.env.CHILEXPRESS_RATING_API_KEY;
 
-// Mapeo de códigos de región INE a códigos de región Chilexpress
 const regionCodeMap = {
     '1': 'R1',
     '2': 'R2', 
@@ -33,17 +33,9 @@ router.get("/cobertura", async (req, res) => {
         });
     }
 
-    // Convertir código de región al formato de Chilexpress
     const chilexpressRegionCode = regionCodeMap[regionCode] || regionCode;
 
-    console.log("Consultando cobertura:", { 
-        regionCode: regionCode, 
-        comunaCode: comunaCode,
-        chilexpressRegionCode: chilexpressRegionCode 
-    });
-
     try {
-        // FORZAR uso de URL de desarrollo/test
         const baseUrl = 'https://testservices.wschilexpress.com';
             
         const url = `${baseUrl}/georeference/api/v1.0/coverage-areas?RegionCode=${chilexpressRegionCode}&type=0`;
@@ -68,7 +60,6 @@ router.get("/cobertura", async (req, res) => {
         const data = await response.json();
         console.log("Respuesta Chilexpress:", JSON.stringify(data, null, 2));
 
-        // Verificar que la respuesta sea exitosa según la documentación
         if (data.statusCode !== 0) {
             console.log("Error en respuesta Chilexpress:", data.statusDescription);
             return res.json({ 
@@ -77,7 +68,6 @@ router.get("/cobertura", async (req, res) => {
             });
         }
 
-        // Verificar que existan áreas de cobertura
         if (!data.coverageAreas || !Array.isArray(data.coverageAreas) || data.coverageAreas.length === 0) {
             console.log("No hay áreas de cobertura disponibles");
             return res.json({ 
@@ -86,9 +76,7 @@ router.get("/cobertura", async (req, res) => {
             });
         }
 
-        // Buscar la comuna específica en las áreas de cobertura
         const encontrada = data.coverageAreas.find(area => {
-            // Normalizar códigos para comparación
             const normalizeCode = (code) => {
                 if (!code) return null;
                 const codeStr = code.toString();
@@ -101,20 +89,11 @@ router.get("/cobertura", async (req, res) => {
             const comunaNormalizada = normalizeCode(comunaCode);
             const areaNormalizada = normalizeCode(area.ineCountyCode);
             
-            // Buscar por código normalizado O por código completo
             return areaNormalizada === comunaNormalizada || 
                    area.ineCountyCode?.toString() === comunaCode.toString();
         });
 
-        console.log("Detalles de búsqueda:", {
-            comunaCodeOriginal: comunaCode,
-            comunaNormalizada: parseInt(comunaCode.toString().substring(2), 10),
-            totalAreas: data.coverageAreas.length,
-            ejemploArea: data.coverageAreas[0] ? {
-                name: data.coverageAreas[0].countyName,
-                ineCode: data.coverageAreas[0].ineCountyCode
-            } : null
-        });
+        
 
         console.log("Comuna encontrada:", encontrada ? 
             `${encontrada.countyName} (${encontrada.countyCode}) - INE: ${encontrada.ineCountyCode}` : 
@@ -157,13 +136,9 @@ router.get("/cobertura", async (req, res) => {
     }
 });
 
-// Endpoint adicional para obtener todas las regiones
 router.get("/regiones", async (req, res) => {
     try {
-        console.log("CHILEXPRESS_API_KEY existe:", !!CHILEXPRESS_KEY);
-        console.log("NODE_ENV:", process.env.NODE_ENV);
         
-        // FORZAR uso de URL de desarrollo/test
         const baseUrl = 'https://testservices.wschilexpress.com';
             
         const url = `${baseUrl}/georeference/api/v1.0/regions`;
@@ -179,7 +154,6 @@ router.get("/regiones", async (req, res) => {
             },
         });
 
-        console.log("Response status:", response.status);
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -210,7 +184,6 @@ router.get("/regiones", async (req, res) => {
     }
 });
 
-// Endpoint adicional para obtener todas las áreas de cobertura de una región
 router.get("/areas-cobertura/:regionCode", async (req, res) => {
     const { regionCode } = req.params;
 
@@ -218,11 +191,9 @@ router.get("/areas-cobertura/:regionCode", async (req, res) => {
         return res.status(400).json({ error: "regionCode es requerido" });
     }
 
-    // Convertir código de región al formato de Chilexpress
     const chilexpressRegionCode = regionCodeMap[regionCode] || regionCode;
 
     try {
-        // FORZAR uso de URL de desarrollo/test
         const baseUrl = 'https://testservices.wschilexpress.com';
             
         const url = `${baseUrl}/georeference/api/v1.0/coverage-areas?RegionCode=${chilexpressRegionCode}&type=0`;
@@ -264,7 +235,107 @@ router.get("/areas-cobertura/:regionCode", async (req, res) => {
     }
 });
 
-// Endpoint de debug (eliminar después)
+router.post("/cotizar", async (req, res) => {
+    const { 
+        destinationCountyCode, 
+        package: packageInfo, 
+        declaredWorth 
+    } = req.body;
+
+    if (!destinationCountyCode || !packageInfo) {
+        return res.status(400).json({ 
+            error: "destinationCountyCode y package son requeridos"
+        });
+    }
+
+    console.log("Cotizando envío:", { 
+        destinationCountyCode, 
+        packageInfo, 
+        declaredWorth 
+    });
+
+    try {
+        const baseUrl = 'https://testservices.wschilexpress.com';
+        const url = `${baseUrl}/rating/api/v1.0/rates/courier`;
+        
+        const requestBody = {
+            originCountyCode: "LOAL",
+            destinationCountyCode: destinationCountyCode,
+            package: {
+                weight: packageInfo.weight.toString(),
+                height: packageInfo.height.toString(),
+                width: packageInfo.width.toString(),
+                length: packageInfo.length.toString()
+            },
+            productType: 3, 
+            contentType: 1,
+            declaredWorth: declaredWorth.toString(),
+            deliveryTime: 0 
+        };
+
+        console.log("Request body:", JSON.stringify(requestBody, null, 2));
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                "Ocp-Apim-Subscription-Key": CHILEXPRESS_RATING_KEY,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Cache-Control": "no-cache"
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Error HTTP ${response.status}:`, errorText);
+            throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log("Respuesta Chilexpress cotización:", JSON.stringify(data, null, 2));
+
+        if (data.statusCode !== 0) {
+            console.log("Error en respuesta Chilexpress:", data.statusDescription);
+            return res.status(400).json({ 
+                error: data.statusDescription || "Error al cotizar envío",
+                details: data.errors
+            });
+        }
+
+        const servicios = data.data?.courierServiceOptions || [];
+        
+        if (servicios.length === 0) {
+            return res.json({
+                success: false,
+                message: "No hay servicios disponibles para esta ubicación"
+            });
+        }
+
+        const serviciosOrdenados = servicios.sort((a, b) => 
+            parseInt(a.serviceValue) - parseInt(b.serviceValue)
+        );
+
+        res.json({
+            success: true,
+            data: {
+                servicioRecomendado: serviciosOrdenados[0],
+                todosLosServicios: serviciosOrdenados,
+                costoEnvio: parseInt(serviciosOrdenados[0].serviceValue),
+                descripcionServicio: serviciosOrdenados[0].serviceDescription
+            }
+        });
+
+    } catch (err) {
+        console.error("Error detallado en cotización:", err);
+        res.status(500).json({ 
+            error: "Error cotizando envío",
+            message: err.message,
+            details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
+    }
+});
+
 router.get("/debug", async (req, res) => {
     res.json({
         NODE_ENV: process.env.NODE_ENV,

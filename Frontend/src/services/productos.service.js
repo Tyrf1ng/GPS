@@ -1,6 +1,5 @@
 import axios from "./root.service.js"
 
-// ===== FUNCIONES DE PRODUCTOS EXISTENTES =====
 
 export async function getProductosDisponibles() {
   try {
@@ -20,7 +19,7 @@ export async function getProductos() {
     const response = await axios.get("/productos/all");
     return {
       success: true,
-      data: response.data.data, // Estructura consistente con el backend
+      data: response.data.data, 
     };
   } catch (error) {
     console.error("Error al obtener productos:", error);
@@ -71,7 +70,6 @@ export async function getProductoById(id_producto) {
   }
 }
 
-// ===== NUEVAS FUNCIONES QUE NECESITAS AGREGAR AL BACKEND =====
 
 export async function createProducto(productoData) {
   try {
@@ -100,7 +98,7 @@ export async function updateProducto(id_producto, productoData) {
       }
     });
 
-    return { data: response.data, error: null }; // Mantener formato original
+    return { data: response.data, error: null }; 
   } catch (error) {
     console.error("Error al actualizar producto:", error);
     return {
@@ -123,7 +121,6 @@ export async function deleteProducto(id_producto) {
   }
 }
 
-// ===== FUNCIONES DE CATEGORÍAS =====
 
 export async function getCategorias() {
   try {
@@ -189,7 +186,6 @@ export async function deleteCategoria(id) {
   }
 }
 
-// ===== FUNCIONES HELPER =====
 
 export const handleApiError = (error, defaultMessage = "Ha ocurrido un error") => {
   console.error("API Error:", error)
@@ -197,19 +193,16 @@ export const handleApiError = (error, defaultMessage = "Ha ocurrido un error") =
 }
 
 export const formatProductoData = (formData, categorias = []) => {
-  // Buscar tanto "categoria" como "id_categoria"
   let id_categoria = formData.id_categoria || formData.categoria;
   
   if (isNaN(id_categoria)) {
-    // Es un nombre, buscar el ID
     const categoria = categorias.find((cat) => cat.nombre === id_categoria);
     id_categoria = categoria ? categoria.id_categoria : null;
   }
 
-  // Verificar que id_categoria sea válido antes de parseInt
   if (!id_categoria || id_categoria === null) {
     console.error('Error: id_categoria no válido:', id_categoria);
-    return null; // O lanzar un error
+    return null; 
   }
 
   const data = {
@@ -218,11 +211,10 @@ export const formatProductoData = (formData, categorias = []) => {
     precio: Number.parseFloat(formData.precio),
     stock: Number.parseInt(formData.stock),
     id_categoria: Number.parseInt(id_categoria),
-    estado: formData.estado || "activo", // Mantener "activo"
+    estado: formData.estado || "activo", 
     image_url: formData.image_url || null,
   };
 
-  // Añadir campos de dimensiones y peso si están presentes
   if (formData.peso !== undefined && formData.peso !== "" && formData.peso !== null) {
     data.peso = Number.parseFloat(formData.peso);
   }

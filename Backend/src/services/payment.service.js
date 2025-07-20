@@ -79,30 +79,12 @@ export class PaymentService {
       const compraGuardada = await compraRepository.save(compra);
 
       if (Array.isArray(productos)) {
-        console.log('=== DEBUG PRODUCTOS EN PAYMENT SERVICE ===');
-        console.log('Productos recibidos:', JSON.stringify(productos, null, 2));
-        
         for (const prod of productos) {
-          console.log('Procesando producto:', {
-            id_producto: prod.id_producto,
-            cantidad: prod.cantidad || prod.quantity || 1,
-            precio: prod.precio,
-            price: prod.price,
-            unit_price: prod.unit_price, 
-            estructura_completa: Object.keys(prod)
-          });
-          
           if (prod.id_producto) {
             const precio_unitario = prod.unit_price || 
                                    prod.precio || 
                                    prod.price || 
                                    0;
-            
-            if (precio_unitario === 0) {
-              console.warn(`⚠️ PRECIO CERO para producto ${prod.id_producto}:`, prod);
-            } else {
-              console.log(`✅ Precio encontrado para producto ${prod.id_producto}: $${precio_unitario}`);
-            }
             
             const compraProd = compraProductoRepository.create({
               id_compra: compraGuardada.id_compra,

@@ -387,7 +387,7 @@ const OrderSummary = ({
       <div className="space-y-3 mb-4">
         {cart.map((item) => (
           <div
-            key={item.id_producto}
+            key={item.id_producto} 
             className="flex justify-between items-center"
           >
             <div className="flex items-center gap-2">
@@ -464,6 +464,8 @@ function MultiStepCheckout() {
     removeItemFromCart,
     clearCart,
     total: totalCarrito,
+    incrementItemQuantity, 
+    decrementItemQuantity, 
   } = useCart();
 
   const navigate = useNavigate();
@@ -656,15 +658,15 @@ function MultiStepCheckout() {
               <div className="space-y-4">
                 {carrito.map((item) => (
                   <CartItem
-                    key={item.id}
+                    key={item.id_producto} // ✅ Usar id_producto como key
                     title={item.nombre}
                     price={Number(item.precio.toString().replace(/\./g, ""))}
                     quantity={item.cantidad || 1}
                     image={item.imagen}
-                    onRemove={() => removeItemFromCart(item.id)}
-                    onAddToFavorites={() => handleAddToFavorites(item.id)}
-                    onIncrease={() => addItemToCart(item)}
-                    onDecrease={() => removeItemFromCart(item.id)}
+                    onRemove={() => removeItemFromCart(item)} 
+                    onAddToFavorites={() => handleAddToFavorites(item.id_producto)}
+                    onIncrease={() => incrementItemQuantity(item.id_producto)}
+                    onDecrease={() => decrementItemQuantity(item.id_producto)} 
                   />
                 ))}
 
@@ -729,7 +731,7 @@ function MultiStepCheckout() {
               <h4 className="font-medium text-gray-700">Productos:</h4>
               {carrito.map((item) => (
                 <CartItem
-                  key={item.id}
+                  key={item.id_producto}
                   title={item.nombre}
                   price={Number(item.precio.toString().replace(/\./g, ""))}
                   quantity={item.cantidad || 1}

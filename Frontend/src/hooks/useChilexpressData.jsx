@@ -41,7 +41,6 @@ export function useChilexpressData() {
       
       const data = await response.json();
       
-      // Agrupar por comuna (eliminar duplicados por diferentes queryMode)
       const comunasUnicas = data.data.reduce((acc, area) => {
         if (!acc[area.ineCountyCode]) {
           acc[area.ineCountyCode] = {

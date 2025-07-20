@@ -11,7 +11,7 @@ export function useChilexpressData() {
       setLoading(true);
       setError(null);
       
-      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:10000/api";
       const response = await fetch(`${apiUrl}/chilexpress/regiones`);
       
       if (!response.ok) {
@@ -19,8 +19,10 @@ export function useChilexpressData() {
       }
       
       const data = await response.json();
+      console.log('🗺️ Regiones cargadas:', data.data?.length || 0);
       setRegiones(data.data || []);
     } catch (err) {
+      console.error('❌ Error al cargar regiones:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -32,7 +34,9 @@ export function useChilexpressData() {
       setLoading(true);
       setError(null);
       
-      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      console.log(`🏙️ Cargando comunas para región: ${regionCode}`);
+      
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:10000/api";
       const response = await fetch(`${apiUrl}/chilexpress/areas-cobertura/${regionCode}`);
       
       if (!response.ok) {
@@ -40,6 +44,7 @@ export function useChilexpressData() {
       }
       
       const data = await response.json();
+      console.log(`📍 Áreas de cobertura encontradas:`, data.data?.length || 0);
       
       const comunasUnicas = data.data.reduce((acc, area) => {
         if (!acc[area.ineCountyCode]) {
@@ -52,12 +57,16 @@ export function useChilexpressData() {
         return acc;
       }, {});
       
+      const comunasArray = Object.values(comunasUnicas).sort((a, b) => a.name.localeCompare(b.name));
+      console.log(`🏘️ Comunas únicas procesadas:`, comunasArray.length);
+      
       setComunasPorRegion(prev => ({
         ...prev,
-        [regionCode]: Object.values(comunasUnicas).sort((a, b) => a.name.localeCompare(b.name))
+        [regionCode]: comunasArray
       }));
       
     } catch (err) {
+      console.error('❌ Error al cargar comunas:', err);
       setError(err.message);
     } finally {
       setLoading(false);

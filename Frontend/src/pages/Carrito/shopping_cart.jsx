@@ -3,11 +3,10 @@ import { Link } from 'react-router-dom';
 import { initMercadoPago, Wallet } from '@mercadopago/sdk-react';
 import { useCart } from '../../context/CartContext.jsx';
 import { Heart, Trash2, ArrowLeft } from 'lucide-react';
-const API_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const mpPublicKey = import.meta.env.VITE_MP_PUBLIC_KEY;
 initMercadoPago(mpPublicKey, { locale: 'es-CL' });
 
-// Función para formatear precios
 const formatPrice = (price) => {
   return new Intl.NumberFormat('es-CL').format(price);
 };
@@ -100,26 +99,25 @@ const CartItem = ({
 };
 
 const ShoppingCart = () => {
-  // CORRECCIÓN: Usar las funciones correctas del CartContext
+  
   const { 
     cart: carrito, 
-    removeItemFromCart, // Cambiar de 'removeItem' a 'removeItemFromCart'
-    incrementItemQuantity, // Cambiar de 'increaseQuantity' a 'incrementItemQuantity'
-    decrementItemQuantity // Cambiar de 'decreaseQuantity' a 'decrementItemQuantity'
+    removeItemFromCart, 
+    incrementItemQuantity, 
+    decrementItemQuantity 
   } = useCart();
   
   const [preferenceId, setPreferenceId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Calcular totales
   const subtotal = carrito.reduce(
     (total, item) => total + (Number(item.precio.toString().replace(/\./g, '')) * (item.cantidad || 1)),
     0
   );
   
-  const discount = 0; // Descuento (puedes implementar lógica real aquí)
-  const shipping = 3000; // Costo de envío fijo
+  const discount = 0; 
+  const shipping = 3000; 
   const total = subtotal - discount + shipping;
 
   const handleAddToFavorites = (itemId) => {
@@ -184,12 +182,11 @@ const ShoppingCart = () => {
           <div className="w-full lg:w-2/3 space-y-6">
             {carrito.map((item) => (
               <CartItem
-                key={item.id_producto} // CORRECCIÓN: Usar id_producto como clave única
+                key={item.id_producto} 
                 title={item.nombre}
                 price={formatPrice(Number(item.precio.toString().replace(/\./g, '')))}
                 quantity={item.cantidad || 1}
                 image={item.imagen}
-                // CORRECCIÓN: Pasar el item completo a removeItemFromCart y usar id_producto para las otras funciones
                 onRemove={() => removeItemFromCart(item)}
                 onAddToFavorites={() => handleAddToFavorites(item.id_producto)}
                 onIncrease={() => incrementItemQuantity(item.id_producto)}

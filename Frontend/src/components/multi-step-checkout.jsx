@@ -23,7 +23,7 @@ import {
   Clock, 
 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_BASE_URL || "http://localhost:3000/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 const mpPublicKey = import.meta.env.VITE_MP_PUBLIC_KEY;
 initMercadoPago(mpPublicKey, { locale: "es-CL" });
 

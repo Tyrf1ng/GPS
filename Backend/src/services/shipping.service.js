@@ -4,14 +4,23 @@ const CHILEXPRESS_RATING_KEY = process.env.CHILEXPRESS_RATING_API_KEY;
 
 export async function calcularCostoEnvio(productos, destinationCountyCode) {
     try {
+        console.log('🚚 === INICIO COTIZACIÓN ===');
+        console.log('📦 Productos recibidos:', productos);
+        console.log('📍 Destino INE:', destinationCountyCode);
+
         const cobertura = await obtenerCodigoChilexpress(destinationCountyCode);
+        console.log('🗺️ Resultado cobertura:', cobertura);
+        
         if (!cobertura.success) {
             return { success: false, error: cobertura.error };
         }
 
         let pesoTotal = 0;
-        let volumenTotal = 0;
         let valorDeclarado = 0;
+        
+        let anchoMaximo = 0;
+        let altoMaximo = 0;
+        let profundidadMaxima = 0;
 
         productos.forEach(item => {
             const cantidad = item.cantidad || 1;
@@ -23,18 +32,30 @@ export async function calcularCostoEnvio(productos, destinationCountyCode) {
             const precio = parseInt(item.precio.toString().replace(/\./g, ''));
             
             pesoTotal += peso * cantidad;
-            volumenTotal += (ancho * alto * profundidad) * cantidad;
             valorDeclarado += precio * cantidad;
+            
+            anchoMaximo = Math.max(anchoMaximo, ancho);
+            altoMaximo = Math.max(altoMaximo, alto);
+            profundidadMaxima = Math.max(profundidadMaxima, profundidad);
         });
 
-        const ladoCubo = Math.ceil(Math.cbrt(volumenTotal));
-        
+        const LIMITE_DIMENSION = 100; 
+        const factorEmpaque = 1.1; 
+
         const packageInfo = {
             weight: Math.max(pesoTotal, 0.1),
-            height: Math.max(ladoCubo, 1),
-            width: Math.max(ladoCubo, 1),
-            length: Math.max(ladoCubo, 1)
+            height: Math.min(Math.ceil(altoMaximo * factorEmpaque), LIMITE_DIMENSION),
+            width: Math.min(Math.ceil(anchoMaximo * factorEmpaque), LIMITE_DIMENSION),
+            length: Math.min(Math.ceil(profundidadMaxima * factorEmpaque), LIMITE_DIMENSION)
         };
+
+        console.log('📐 Cálculo de dimensiones:', {
+            dimensionesOriginales: `${anchoMaximo}×${altoMaximo}×${profundidadMaxima}`,
+            conEmpaque: `${Math.ceil(anchoMaximo * factorEmpaque)}×${Math.ceil(altoMaximo * factorEmpaque)}×${Math.ceil(profundidadMaxima * factorEmpaque)}`,
+            final: `${packageInfo.width}×${packageInfo.height}×${packageInfo.length}`,
+            peso: `${packageInfo.weight}kg`,
+            limitesAplicados: packageInfo.width === LIMITE_DIMENSION || packageInfo.height === LIMITE_DIMENSION || packageInfo.length === LIMITE_DIMENSION
+        });
 
         const baseUrl = 'https://testservices.wschilexpress.com';
         const url = `${baseUrl}/rating/api/v1.0/rates/courier`;
@@ -54,6 +75,8 @@ export async function calcularCostoEnvio(productos, destinationCountyCode) {
             deliveryTime: 0
         };
 
+        console.log('📨 Request a Chilexpress:', JSON.stringify(requestBody, null, 2));
+
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -65,13 +88,10 @@ export async function calcularCostoEnvio(productos, destinationCountyCode) {
             body: JSON.stringify(requestBody)
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Error HTTP ${response.status}:`, errorText);
-            return { success: false, error: `Error HTTP: ${response.status}` };
-        }
-
+        console.log('📬 Response status:', response.status);
+        
         const data = await response.json();
+        console.log('📬 Response completa:', JSON.stringify(data, null, 2));
 
         if (data.statusCode !== 0) {
             return { 
@@ -83,15 +103,27 @@ export async function calcularCostoEnvio(productos, destinationCountyCode) {
         const servicios = data.data?.courierServiceOptions || [];
         
         if (servicios.length === 0) {
+            console.log('⚠️ No hay servicios disponibles. Diagnóstico:');
+            console.log(`- Dimensiones enviadas: ${packageInfo.width}×${packageInfo.height}×${packageInfo.length}`);
+            console.log(`- Peso: ${packageInfo.weight}kg`);
+            console.log(`- Destino: ${cobertura.chilexpressCode}`);
+            console.log('- Posibles causas: dimensiones exceden límites, peso muy alto, o restricciones de zona');
+            
             return {
                 success: false,
-                error: "No hay servicios disponibles para esta ubicación"
+                error: "No hay servicios disponibles para esta ubicación. Las dimensiones o peso pueden exceder los límites permitidos."
             };
         }
 
         const servicioMasEconomico = servicios.sort((a, b) => 
             parseInt(a.serviceValue) - parseInt(b.serviceValue)
         )[0];
+
+        console.log('✅ Servicio encontrado:', {
+            descripcion: servicioMasEconomico.serviceDescription,
+            costo: servicioMasEconomico.serviceValue,
+            peso: servicioMasEconomico.finalWeight
+        });
 
         return {
             success: true,
@@ -102,7 +134,7 @@ export async function calcularCostoEnvio(productos, destinationCountyCode) {
         };
 
     } catch (error) {
-        console.error("Error calculando costo de envío:", error);
+        console.error("❌ Error completo:", error);
         return { 
             success: false, 
             error: "Error interno al calcular envío" 

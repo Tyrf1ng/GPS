@@ -15,7 +15,10 @@ export class PaymentService {
       const direccionRepository = AppDataSource.getRepository(Direccion);
       const envioRepository = AppDataSource.getRepository(Envio);
 
-      const emailForm = datosPersonales.email || "";
+      const emailForm = datosPersonales.email || 
+                       datosPersonales.mail || 
+                       transactionData.email || 
+                       `invitado_${Date.now()}@gps-temp.com`;
 
       let usuarioInvitado = await usuarioRepository.findOne({
         where: { email: emailForm }
@@ -23,17 +26,26 @@ export class PaymentService {
 
       let direccionGuardada = null;
       if (!usuarioInvitado) {
+        const direccionCompleta = datosPersonales.address || "Dirección no especificada";
+        
+        // Intentar parsear dirección completa en calle y número
+        const direccionParts = direccionCompleta.split(' ');
+        const posibleNumero = direccionParts[direccionParts.length - 1];
+        const esNumero = /^\d+$/.test(posibleNumero);
+        
         const direccionData = {
-          direccion: datosPersonales.address || "",
-          ciudad: datosPersonales.ciudad || datosPersonales.comunaCode || "No especificada",
-          region: datosPersonales.region || datosPersonales.regionCode || "No especificada",
+          calle: esNumero ? direccionParts.slice(0, -1).join(' ') || "Calle no especificada" : direccionCompleta,
+          numero: esNumero ? posibleNumero : "S/N",
+          comuna: datosPersonales.ciudad || datosPersonales.comunaCode || "Comuna no especificada",
+          region: datosPersonales.region || datosPersonales.regionCode || "Región no especificada",
           codigo_postal: datosPersonales.postalCode || "00000",
-          pais: "Chile",
           tipo_de_direccion: "predeterminada"
         };
+        
+        console.log('🏠 Creando dirección:', direccionData);
         direccionGuardada = await direccionRepository.save(direccionData);
 
-        const baseName = (datosPersonales.nombres || "Invitado").replace(/\s+/g, '');
+        const baseName = (datosPersonales.nombres || datosPersonales.name || "Invitado").replace(/\s+/g, '');
         const invitadoNamePrefix = `${baseName}_invitado_`;
 
         const existingInvitados = await usuarioRepository
@@ -44,9 +56,9 @@ export class PaymentService {
         const nuevoNombre = `${invitadoNamePrefix}${existingInvitados + 1}`;
 
         usuarioInvitado = usuarioRepository.create({
-          nombreCompleto: `${datosPersonales.nombres} ${datosPersonales.apellidos}` || nuevoNombre,
+          nombreCompleto: `${datosPersonales.nombres || datosPersonales.name || 'Invitado'} ${datosPersonales.apellidos || datosPersonales.surname || 'Usuario'}` || nuevoNombre,
           email: emailForm,
-          telefono: datosPersonales.phone || "",
+          telefono: datosPersonales.phone || datosPersonales.telefono || "",
           password: "null",
           rol: "invitado",
           id_direccion: direccionGuardada.id_direccion
@@ -65,14 +77,14 @@ export class PaymentService {
         merchant_order_id: transactionData.merchant_order_id,
         preference_id: transactionData.preference_id,
         id_usuario: idUsuario,
-        nombre: datosPersonales.nombres || "",
-        apellido: datosPersonales.apellidos || "",
+        nombre: datosPersonales.nombres || datosPersonales.name || "No especificado",
+        apellido: datosPersonales.apellidos || datosPersonales.surname || "No especificado",
         email: emailForm,
-        telefono: datosPersonales.phone || "",
-        direccion: datosPersonales.address || "",
-        region: datosPersonales.region || datosPersonales.regionCode || "",
-        ciudad: datosPersonales.ciudad || datosPersonales.comunaCode || "",
-        codigo_postal: datosPersonales.postalCode || "",
+        telefono: datosPersonales.phone || datosPersonales.telefono || "",
+        direccion: datosPersonales.address || "Dirección no especificada",
+        region: datosPersonales.region || datosPersonales.regionCode || "Región no especificada",
+        ciudad: datosPersonales.ciudad || datosPersonales.comunaCode || "Comuna no especificada",
+        codigo_postal: datosPersonales.postalCode || "00000",
         instrucciones: datosPersonales.instructions || "",
         email_mp: transactionData.email || ""
       };

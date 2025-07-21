@@ -15,20 +15,38 @@ export const createPreference = async (req, res) => {
   try {
     const { items, external_reference, shipping_info, datosPersonales } = req.body;
 
+    // ✅ Log detallado de shipping_info para debug
+    console.log('🚚 DEBUG shipping_info completo:', JSON.stringify(shipping_info, null, 2));
+    
     // ✅ Preparar items incluyendo envío si corresponde
     let finalItems = [...items];
     
     // ✅ Agregar costo de envío como item si existe
-    if (shipping_info && shipping_info.costo && shipping_info.costo > 0) {
+    // Verificar múltiples formatos posibles del shipping_info
+    const shippingCost = shipping_info?.costo || 
+                        shipping_info?.cost || 
+                        shipping_info?.precio || 
+                        shipping_info?.serviceValue ||
+                        0;
+    
+    const shippingDescription = shipping_info?.descripcion || 
+                               shipping_info?.description || 
+                               shipping_info?.servicio ||
+                               shipping_info?.serviceDescription ||
+                               'CHILEXPRESS';
+    
+    if (shippingCost && shippingCost > 0) {
       finalItems.push({
-        title: `Envío ${shipping_info.descripcion || 'CHILEXPRESS'}`,
-        unit_price: parseInt(shipping_info.costo),
+        title: `Envío ${shippingDescription}`,
+        unit_price: parseInt(shippingCost),
         quantity: 1,
         currency_id: "CLP",
         category_id: "shipping"
       });
       
-      console.log(`📦 Envío agregado: ${shipping_info.descripcion} - $${shipping_info.costo}`);
+      console.log(`📦 Envío agregado: ${shippingDescription} - $${shippingCost}`);
+    } else {
+      console.log('⚠️ No se encontró información válida de envío para agregar');
     }
 
     console.log('🔍 Datos recibidos en createPreference:', {

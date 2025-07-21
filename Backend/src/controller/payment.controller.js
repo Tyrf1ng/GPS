@@ -15,11 +15,32 @@ export const createPreference = async (req, res) => {
   try {
     const { items, external_reference, shipping_info, datosPersonales } = req.body;
 
+    // ✅ Preparar items incluyendo envío si corresponde
+    let finalItems = [...items];
+    
+    // ✅ Agregar costo de envío como item si existe
+    if (shipping_info && shipping_info.costo && shipping_info.costo > 0) {
+      finalItems.push({
+        title: `Envío ${shipping_info.descripcion || 'CHILEXPRESS'}`,
+        unit_price: parseInt(shipping_info.costo),
+        quantity: 1,
+        currency_id: "CLP",
+        category_id: "shipping"
+      });
+      
+      console.log(`📦 Envío agregado: ${shipping_info.descripcion} - $${shipping_info.costo}`);
+    }
+
     console.log('🔍 Datos recibidos en createPreference:', {
       items: items?.length || 0,
+      finalItems: finalItems?.length || 0,
       external_reference,
-      shipping_info: !!shipping_info,
-      datosPersonales: !!datosPersonales
+      shipping_info: shipping_info ? {
+        descripcion: shipping_info.descripcion,
+        costo: shipping_info.costo
+      } : null,
+      datosPersonales: !!datosPersonales,
+      costoTotal: finalItems.reduce((total, item) => total + (item.unit_price * item.quantity), 0)
     });
 
     // ✅ NUEVO: Validar datos personales si están presentes
@@ -64,12 +85,16 @@ export const createPreference = async (req, res) => {
       });
     }
 
-    // ✅ Guardar compra temporal (con datos validados)
+    // ✅ Guardar compra temporal (con datos validados + info de envío)
+    const datosCompletos = {
+      ...datosPersonales,
+      shipping_info: shipping_info || null
+    };
+    
     await compraTemporalService.saveCompraTemporal(
       external_reference, 
-      items, 
-      shipping_info,
-      datosPersonales // ✅ Incluir datos personales validados
+      finalItems, // ✅ Items finales incluyendo envío
+      datosCompletos // ✅ Datos personales + info de envío
     );
 
     // ✅ NUEVO: Configurar tiempo límite para la preferencia
@@ -77,7 +102,7 @@ export const createPreference = async (req, res) => {
     expiration.setMinutes(expiration.getMinutes() + 15); // 15 minutos
 
     const body = {
-      items,
+      items: finalItems, // ✅ Usar items finales con envío
       external_reference,
       auto_return: "approved",
       
@@ -236,22 +261,23 @@ export const handleWebhook = async (req, res) => {
           preference_id: paymentData.preference_id || 'N/A',
           email: paymentData.payer?.email || "",
           date_created: paymentData.date_created,
-          processing_time: diferenciaMinutos.toFixed(1) // ✅ NUEVO: Registro del tiempo
+          processing_time: diferenciaMinutos.toFixed(1) 
         };
 
         if (transactionData.status === 'approved') {
           console.log('💰 Pago aprobado, confirmando reserva...');
           
           // ✅ NUEVO: Verificar que la reserva siga activa
-          const reservaActiva = await reservaStockService.verificarReservaActiva(
+          const reservaActiva = reservaStockService.verificarReservaActiva(
             transactionData.external_reference
           );
           
-          if (!reservaActiva) {
-            console.error('❌ Reserva no encontrada o expirada:', transactionData.external_reference);
+          if (!reservaActiva.activa) {
+            console.error('❌ Reserva no encontrada o expirada:', transactionData.external_reference, 'Motivo:', reservaActiva.motivo);
             return res.status(400).json({
               error: 'La reserva de stock ha expirado',
-              code: 'RESERVATION_EXPIRED'
+              code: 'RESERVATION_EXPIRED',
+              motivo: reservaActiva.motivo
             });
           }
           

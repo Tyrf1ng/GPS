@@ -176,6 +176,31 @@ class ReservaStockMemoria {
         }
     }
 
+    // Verificar si una reserva está activa
+    verificarReservaActiva(externalReference) {
+        const reserva = this.reservas.get(externalReference);
+        
+        if (!reserva) {
+            return { activa: false, motivo: 'no_encontrada' };
+        }
+
+        if (reserva.estado !== 'pendiente') {
+            return { activa: false, motivo: `ya_procesada_${reserva.estado}` };
+        }
+
+        const ahora = Date.now();
+        if (reserva.expiraEn <= ahora) {
+            return { activa: false, motivo: 'expirada' };
+        }
+
+        return { 
+            activa: true, 
+            productos: reserva.productos,
+            expiraEn: reserva.expiraEn,
+            tiempoRestante: reserva.expiraEn - ahora
+        };
+    }
+
     // Debug: Obtener estado de todas las reservas
     getEstadoReservas() {
         const ahora = Date.now();

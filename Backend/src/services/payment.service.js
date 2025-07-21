@@ -4,6 +4,7 @@ import Compra from "../entity/compra.entity.js";
 import CompraProducto from "../entity/compra_producto.entity.js";
 import Usuario from "../entity/usuario.entity.js";
 import Direccion from "../entity/direccion.entity.js";
+import Envio from "../entity/envio.entity.js";
 
 export class PaymentService {
   async saveTransaction(transactionData, productos = [], datosPersonales = {}) {
@@ -12,6 +13,7 @@ export class PaymentService {
       const compraProductoRepository = AppDataSource.getRepository(CompraProducto);
       const usuarioRepository = AppDataSource.getRepository(Usuario);
       const direccionRepository = AppDataSource.getRepository(Direccion);
+      const envioRepository = AppDataSource.getRepository(Envio);
 
       const emailForm = datosPersonales.email || "";
 
@@ -95,6 +97,19 @@ export class PaymentService {
             await compraProductoRepository.save(compraProd);
           }
         }
+      }
+
+      // ✅ NUEVO: Crear registro de envío si existe información de shipping
+      if (datosPersonales.shipping_info && datosPersonales.shipping_info.costo) {
+        const envioData = {
+          id_compra: compraGuardada.id_compra,
+          estado: 'pendiente'
+        };
+        
+        const envio = envioRepository.create(envioData);
+        await envioRepository.save(envio);
+        
+        console.log(`📦 Envío creado para compra ${compraGuardada.id_compra} - ${datosPersonales.shipping_info.descripcion}`);
       }
 
       return compraGuardada;

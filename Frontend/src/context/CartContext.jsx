@@ -50,25 +50,12 @@ const useLightDebounce = (func, delay) => {
 
 // Reducer optimizado para manejar las acciones del carrito
 const cartReducer = (state, action) => {
-  // MANTENER TUS LOGS PARA DEBUGGING (opcional)
-  const isDebugMode = process.env.NODE_ENV === 'development';
-  
-  if (isDebugMode) {
-    console.log("🔄 Reducer ejecutado con acción:", action.type);
-    console.log("📦 Payload:", action.payload);
-    console.log("🛒 Estado actual del carrito:", state.cart);
-  }
-
   switch (action.type) {
     case 'ADD_ITEM': {
-      if (isDebugMode) console.log("➕ Agregando item:", action.payload);
-      
       const existingItemIndex = state.cart.findIndex(item => item.id_producto === action.payload.id_producto);
       
       if (existingItemIndex >= 0) {
         // Si el item ya existe, sumar la cantidad nueva
-        if (isDebugMode) console.log("✅ Item existente encontrado, aumentando cantidad");
-        
         const updatedCart = [...state.cart];
         const cantidadAAgregar = action.payload.cantidad || 1;
         updatedCart[existingItemIndex].cantidad += cantidadAAgregar;
@@ -79,12 +66,9 @@ const cartReducer = (state, action) => {
           total: state.total + (action.payload.precio * cantidadAAgregar),
         };
         
-        if (isDebugMode) console.log("🔄 Nuevo estado:", newState.cart);
         return newState;
       } else {
         // Si es un nuevo item, usar la cantidad especificada
-        if (isDebugMode) console.log("🆕 Item nuevo, agregando al carrito");
-        
         const newItem = {
           ...action.payload,
           cantidad: action.payload.cantidad || 1
@@ -96,14 +80,11 @@ const cartReducer = (state, action) => {
           total: state.total + (action.payload.precio * newItem.cantidad),
         };
         
-        if (isDebugMode) console.log("🔄 Nuevo estado:", newState.cart);
         return newState;
       }
     }
     
     case 'REMOVE_ITEM': {
-      if (isDebugMode) console.log("🗑️ Eliminando item con ID:", action.payload.id_producto);
-      
       const itemToRemove = state.cart.find(item => item.id_producto === action.payload.id_producto);
       if (!itemToRemove) return state;
       
@@ -117,7 +98,6 @@ const cartReducer = (state, action) => {
     }
     
     case 'CLEAR_CART':
-      if (isDebugMode) console.log("🧹 Limpiando carrito");
       return {
         ...state,
         cart: [],
@@ -128,7 +108,6 @@ const cartReducer = (state, action) => {
     case 'INCREASE_QUANTITY':
     case 'INCREMENT_QUANTITY': {
       const id_producto = action.payload.id || action.payload.id_producto;
-      if (isDebugMode) console.log("⬆️ Aumentando cantidad para ID:", id_producto);
       
       const itemIndex = state.cart.findIndex(item => item.id_producto === id_producto);
       if (itemIndex < 0) return state;
@@ -151,7 +130,6 @@ const cartReducer = (state, action) => {
     case 'DECREASE_QUANTITY':
     case 'DECREMENT_QUANTITY': {
       const id_producto = action.payload.id || action.payload.id_producto;
-      if (isDebugMode) console.log("⬇️ Disminuyendo cantidad para ID:", id_producto);
       
       const itemIndex = state.cart.findIndex(item => item.id_producto === id_producto);
       if (itemIndex < 0) return state;
@@ -183,7 +161,6 @@ const cartReducer = (state, action) => {
     }
     
     default:
-      if (isDebugMode) console.log("❌ Acción no reconocida:", action.type);
       return state;
   }
 };
@@ -231,37 +208,23 @@ export function CartProvider({ children }) {
 
   // Funciones base optimizadas para interactuar con el carrito
   const addItemToCartBase = useCallback((item) => {
-    const isDebugMode = process.env.NODE_ENV === 'development';
-    if (isDebugMode) {
-      console.log("🛒 addItemToCart llamado con:", item);
-      console.log("🆔 ID del producto:", item.id_producto);
-      console.log("📝 Nombre del producto:", item.nombre);
-    }
     dispatch({ type: 'ADD_ITEM', payload: item });
   }, []);
 
   const removeItemFromCartBase = useCallback((item) => {
-    const isDebugMode = process.env.NODE_ENV === 'development';
-    if (isDebugMode) console.log("🗑️ removeItemFromCart llamado con:", item);
     dispatch({ type: 'REMOVE_ITEM', payload: item });
   }, []);
 
   const clearCartBase = useCallback(() => {
-    const isDebugMode = process.env.NODE_ENV === 'development';
-    if (isDebugMode) console.log("🧹 clearCart llamado");
     dispatch({ type: 'CLEAR_CART' });
   }, []);
 
   // MANTENER COMPATIBILIDAD CON TUS FUNCIONES ORIGINALES
   const increaseQuantityBase = useCallback((id) => {
-    const isDebugMode = process.env.NODE_ENV === 'development';
-    if (isDebugMode) console.log("⬆️ increaseQuantity llamado con ID:", id);
     dispatch({ type: 'INCREASE_QUANTITY', payload: { id } });
   }, []);
 
   const decreaseQuantityBase = useCallback((id) => {
-    const isDebugMode = process.env.NODE_ENV === 'development';
-    if (isDebugMode) console.log("⬇️ decreaseQuantity llamado con ID:", id);
     dispatch({ type: 'DECREASE_QUANTITY', payload: { id } });
   }, []);
 
@@ -292,12 +255,6 @@ export function CartProvider({ children }) {
     (acc, item) => acc + (Number(item.precio?.toString().replace(/\./g, '') || 0) * (item.cantidad || 1)), 
     0
   );
-
-  const isDebugMode = process.env.NODE_ENV === 'development';
-  if (isDebugMode) {
-    console.log("📊 Estado final del carrito:", state.cart);
-    console.log("💰 Total calculado:", total);
-  }
 
   return (
     <CartContext.Provider value={{

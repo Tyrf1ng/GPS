@@ -11,16 +11,17 @@ export function useChilexpressData() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`http://localhost:3000/api/chilexpress/regiones`);
+      // ✅ CORREGIR: Cambiar puerto 3000 por 10000
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:10000/api";
+      const response = await fetch(`${apiUrl}/chilexpress/regiones`);
       
       if (!response.ok) {
         throw new Error('Error al cargar regiones');
       }
       
       const data = await response.json();
-      console.log('Respuesta de regiones:', data); // Debug
+      console.log('Respuesta de regiones:', data);
       
-      // El backend devuelve { success: true, data: [...] }
       setRegiones(data.data || []);
     } catch (err) {
       console.error('Error en fetchRegiones:', err);
@@ -35,19 +36,19 @@ export function useChilexpressData() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`http://localhost:3000/api/chilexpress/areas-cobertura/${regionCode}`);
+      // ✅ CORREGIR: Cambiar puerto 3000 por 10000
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:10000/api";
+      const response = await fetch(`${apiUrl}/chilexpress/areas-cobertura/${regionCode}`);
       
       if (!response.ok) {
         throw new Error('Error al cargar comunas');
       }
       
       const data = await response.json();
-      console.log('Respuesta de comunas:', data); // Debug
+      console.log('Respuesta de comunas:', data);
       
-      // El backend devuelve { success: true, data: [...] }
       const areasCobertura = data.data || [];
       
-      // Agrupar por comuna (eliminar duplicados por diferentes queryMode)
       const comunasUnicas = areasCobertura.reduce((acc, area) => {
         if (!acc[area.ineCountyCode]) {
           acc[area.ineCountyCode] = {

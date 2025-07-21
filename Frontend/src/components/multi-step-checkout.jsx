@@ -730,6 +730,11 @@ function MultiStepCheckout() {
       }));
 
       console.log("💳 Creando preferencia de pago...");
+      console.log("📦 Datos de envío que se enviarán:", {
+        costoEnvio: costoEnvio || 0,
+        servicioDescripcion: servicioDescripcion || 'CHILEXPRESS',
+        shippingData
+      });
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/payments/create_preference`,
         {
@@ -739,6 +744,8 @@ function MultiStepCheckout() {
             items,
             external_reference: externalReference,
             shipping_info: shippingData,
+            costoEnvio: costoEnvio || 0,
+            servicioEnvio: servicioDescripcion || 'CHILEXPRESS'
           }),
         }
       );

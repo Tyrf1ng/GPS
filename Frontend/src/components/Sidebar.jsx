@@ -33,6 +33,11 @@ export default function Sidebar({ isOpen, toggle }) {
               <Link to="/productos" onClick={toggle} className="sidebar_text hover:underline">Productos</Link>
             </li>
           )}
+          {authUser?.rol === "admin" && (
+            <li>
+              <Link to="/admin/gestion-compras" onClick={toggle} className="sidebar_text hover:underline">Gestión de Compras</Link>
+            </li>
+          )}
         </ul>
       </div>
 

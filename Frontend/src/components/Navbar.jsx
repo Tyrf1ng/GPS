@@ -1,7 +1,7 @@
 import { Sling as Hamburger } from "hamburger-react";
 import { Link } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
-import { FaBus,FaUserCircle, FaChevronUp, FaChevronDown, FaShoppingCart, FaShoppingBag, FaUser, FaSignOutAlt, FaStar, FaRegUser, FaSignInAlt, FaUserPlus, FaUserAlt, FaUserTie } from "react-icons/fa";
+import { FaBus,FaUserCircle, FaChevronUp, FaChevronDown, FaShoppingCart, FaShoppingBag, FaUser, FaSignOutAlt, FaStar, FaRegUser, FaSignInAlt, FaUserPlus, FaUserAlt, FaUserTie, FaCog, FaBox } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 import MenuCarrito from "../pages/Carrito/CarritoFunction";
 
@@ -9,7 +9,10 @@ function Navbar({ isOpen, setOpen }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [openCarrito, setOpenCarrito] = useState(false);
   const dropdownRef = useRef(null);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, authUser } = useAuth();
+
+  // Verificar si el usuario es administrador
+  const isAdmin = authUser?.rol === 'admin' || authUser?.rol === 'administrador';
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -97,6 +100,29 @@ function Navbar({ isOpen, setOpen }) {
                     >
                       <FaBus className="text-orange-400" /> Mis Pedidos
                     </Link>
+                    
+                    {/* Opciones de administrador */}
+                    {isAdmin && (
+                      <>
+                        <div className="border-t border-gray-100 my-1" />
+                        <div className="px-4 py-2 text-xs text-gray-500 font-semibold">Administración</div>
+                        <Link
+                          to="/productos"
+                          className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 transition text-sm"
+                          onClick={() => setDropdownOpen(false)}
+                        >
+                          <FaBox className="text-red-400" /> Gestionar Productos
+                        </Link>
+                        <Link
+                          to="/admin/gestion-compras"
+                          className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 transition text-sm"
+                          onClick={() => setDropdownOpen(false)}
+                        >
+                          <FaShoppingBag className="text-red-400" /> Gestión de Compras
+                        </Link>
+                      </>
+                    )}
+                    
                     <div className="border-t border-gray-100 my-1" />
                     <Link
                       to="/logout"

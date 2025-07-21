@@ -56,6 +56,55 @@ export async function getComprasUsuario(id_usuario) {
     }
 }
 
+// Obtener todas las compras (para administradores) con información del usuario
+export async function getAllCompras() {
+    try {
+        const comprasRepository = AppDataSource.getRepository(Compras);
+        const compras = await comprasRepository.find({
+            relations: ["Usuario"],
+            order: { createdAt: "DESC" }
+        });
+
+        // Para cada compra, obtener los productos asociados
+        const comprasConProductos = await Promise.all(
+            compras.map(async (compra) => {
+                const compraProductoRepository = AppDataSource.getRepository(Compra_Producto);
+                const productosCompra = await compraProductoRepository.find({
+                    where: { id_compra: compra.id_compra },
+                    relations: ["Productos"]
+                });
+
+                // Obtener la URL firmada de la imagen para cada producto
+                const productos = await Promise.all(productosCompra.map(async cp => {
+                  let imagen = null;
+                  if (cp.Productos?.image_url) {
+                    imagen = await getUrlImage(cp.Productos.image_url);
+                  }
+
+                  return {
+                    id_producto: cp.Productos?.id_producto || null,
+                    nombre: cp.Productos?.nombre || 'Producto no disponible',
+                    imagen,
+                    precio: cp.Productos?.precio || 0,
+                    cantidad: cp.cantidad || 1,
+                    categoria: cp.Productos?.Categoria?.nombre || 'Sin categoría'
+                  };
+                }));
+
+                return {
+                    ...compra,
+                    productos
+                };
+            })
+        );
+
+        return [comprasConProductos, null];
+    } catch (error) {
+        console.error("Error al obtener todas las compras:", error);
+        return [null, "Error al obtener todas las compras"];
+    }
+}
+
 // Verificar si un usuario ha comprado un producto específico
 export async function verificarCompraProducto(id_usuario, id_producto) {
     try {

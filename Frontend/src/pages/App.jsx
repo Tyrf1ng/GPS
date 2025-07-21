@@ -23,6 +23,7 @@ import MultiStepCart from './Carrito/multi-step-cart.jsx';
 import MisCompras from "./Profile/MisCompras.jsx";
 import MisPedidos from "./Profile/MisPedidos.jsx";
 import GestionDestacados from "../components/GestionDestacados.jsx";
+import GestionCompras from "./Admin/GestionCompras.jsx";
 import Valoraciones from "./Profile/Valoraciones.jsx";
 import ValoracionFormPage from "./Profile/ValoracionFormPage.jsx";
 
@@ -62,6 +63,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={["admin"]}>
             <Productos />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "admin/gestion-compras",
+        element: (
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <GestionCompras />
           </ProtectedRoute>
         ),
       },

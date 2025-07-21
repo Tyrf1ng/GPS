@@ -28,6 +28,20 @@ export async function getComprasUsuario() {
   }
 }
 
+// Obtener todas las compras (solo para administradores)
+export async function getAllCompras() {
+  try {
+    const response = await axios.get('/users/compras');
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error("Error al obtener todas las compras:", error);
+    return {
+      data: null,
+      error: error.response?.data?.message || error.message || "Error al obtener todas las compras",
+    };
+  }
+}
+
 // Verificar si el usuario ha comprado un producto específico
 export async function verificarCompraProducto(id_producto) {
   try {

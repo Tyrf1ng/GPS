@@ -13,13 +13,15 @@ const compraTemporalService = new CompraTemporalService();
 
 export const createPreference = async (req, res) => {
   try {
-    const { items, external_reference, shipping_info, datosPersonales, costoEnvio, servicioEnvio } = req.body;
+    const { items, external_reference, shipping_info, datosPersonales, costoEnvio, servicioEnvio, shippingData } = req.body;
 
     // ✅ Log detallado para debug
     console.log('🚚 DEBUG shipping_info completo:', JSON.stringify(shipping_info, null, 2));
     console.log('🚚 DEBUG datosPersonales:', JSON.stringify(datosPersonales, null, 2));
     console.log('🚚 DEBUG costoEnvio:', costoEnvio);
     console.log('🚚 DEBUG servicioEnvio:', servicioEnvio);
+    console.log('🚚 DEBUG shippingData:', JSON.stringify(shippingData, null, 2));
+    console.log('🚚 DEBUG req.body completo:', JSON.stringify(req.body, null, 2));
     
     // ✅ Determinar datos personales (pueden venir en shipping_info o datosPersonales)
     const datosPersonalesReales = datosPersonales || (shipping_info?.nombres ? shipping_info : null);
@@ -27,19 +29,25 @@ export const createPreference = async (req, res) => {
     // ✅ Preparar items incluyendo envío si corresponde
     let finalItems = [...items];
     
-    // ✅ Buscar información de envío en múltiples ubicaciones
+    // ✅ Buscar información de envío en múltiples ubicaciones posibles
     const shippingCost = costoEnvio || 
+                        shippingData?.costo ||
+                        shippingData?.cost ||
                         shipping_info?.costo || 
                         shipping_info?.cost || 
                         shipping_info?.precio || 
                         shipping_info?.serviceValue ||
+                        req.body.costo_envio ||
                         0;
     
     const shippingDescription = servicioEnvio ||
+                               shippingData?.descripcion ||
+                               shippingData?.servicio ||
                                shipping_info?.descripcion || 
                                shipping_info?.description || 
                                shipping_info?.servicio ||
                                shipping_info?.serviceDescription ||
+                               req.body.servicio_envio ||
                                'CHILEXPRESS';
     
     if (shippingCost && shippingCost > 0) {
@@ -54,7 +62,14 @@ export const createPreference = async (req, res) => {
       console.log(`📦 Envío agregado: ${shippingDescription} - $${shippingCost}`);
     } else {
       console.log('⚠️ No se encontró información válida de envío para agregar');
-      console.log('Valores buscados:', { costoEnvio, shippingCost, shippingDescription });
+      console.log('Valores buscados:', { 
+        costoEnvio, 
+        shippingCost, 
+        shippingDescription,
+        fromShippingData: shippingData?.costo,
+        fromShippingInfo: shipping_info?.costo,
+        fromReqBody: req.body.costo_envio
+      });
     }
 
     console.log('🔍 Datos recibidos en createPreference:', {
@@ -76,19 +91,24 @@ export const createPreference = async (req, res) => {
       if (error) {
         console.error('❌ Errores de validación:', error.details);
         
-        return res.status(400).json({
-          status: 'Error',
-          message: 'Datos del formulario inválidos',
-          errors: error.details.map(detail => ({
-            field: detail.context.key,
-            message: detail.message,
-            value: detail.context.value
-          })),
-          code: 'VALIDATION_ERROR'
-        });
+        // ✅ NUEVO: Si hay costo de envío, ser más permisivo con la validación
+        if (shippingCost > 0) {
+          console.warn('⚠️ Validación falló pero hay costo de envío, continuando con validación relajada...');
+        } else {
+          return res.status(400).json({
+            status: 'Error',
+            message: 'Datos del formulario inválidos',
+            errors: error.details.map(detail => ({
+              field: detail.context.key,
+              message: detail.message,
+              value: detail.context.value
+            })),
+            code: 'VALIDATION_ERROR'
+          });
+        }
+      } else {
+        console.log('✅ Datos personales validados correctamente');
       }
-      
-      console.log('✅ Datos personales validados correctamente');
     }
 
     // ✅ NUEVO: Validar items

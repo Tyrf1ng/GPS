@@ -15,10 +15,10 @@ const emailValidation = Joi.string()
     });
 
 const telefonoValidation = Joi.string()
-    .pattern(/^\+569[0-9]{8}$/)
+    .pattern(/^(\+56)?9[0-9]{8}$/)
     .required()
     .messages({
-        'string.pattern.base': 'Teléfono debe tener formato +569XXXXXXXX (9 dígitos después de +569)',
+        'string.pattern.base': 'Teléfono debe tener formato 9XXXXXXXX o +569XXXXXXXX (8 dígitos después del 9)',
         'string.empty': 'Teléfono es requerido',
         'any.required': 'Teléfono es requerido'
     });

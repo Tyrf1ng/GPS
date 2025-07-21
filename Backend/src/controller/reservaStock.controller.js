@@ -48,6 +48,31 @@ export const getStockDisponibleController = async (req, res) => {
     }
 };
 
+export const cancelarReservaController = async (req, res) => {
+    try {
+        const { external_reference } = req.body;
+
+        if (!external_reference) {
+            return handleErrorClient(res, 400, "Se requiere external_reference");
+        }
+
+        const resultado = await reservaStockService.cancelarReserva(external_reference, 'cancelado_manualmente');
+
+        if (resultado.success) {
+            return handleSuccess(res, 200, resultado.message, {
+                external_reference,
+                estado: 'cancelado'
+            });
+        } else {
+            return handleErrorClient(res, 400, resultado.error);
+        }
+
+    } catch (error) {
+        console.error('Error en cancelarReservaController:', error);
+        return handleErrorServer(res, 500, "Error interno al cancelar reserva");
+    }
+};
+
 // DEBUG: Endpoint para ver estado de reservas
 export const getEstadoReservasController = async (req, res) => {
     try {

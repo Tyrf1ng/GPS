@@ -11,6 +11,9 @@ import WalletComponent from "./WalletComponent";
 import { useFormValidation } from "../hooks/useFormValidation.js";
 import { ValidatedInput } from "./ValidatedInput.jsx";
 import toast, { Toaster } from "react-hot-toast";
+import { useShippingAddresses } from '../hooks/useShippingAddresses';
+import AddressSelector from './AddressSelector';
+import { useAuth } from "../context/AuthContext.jsx";
 
 import {
   Heart,
@@ -508,6 +511,30 @@ function MultiStepCheckout() {
   const { errors, validateForm, validateField, formatPhone, clearFieldError } =
     useFormValidation();
 
+  const { authUser, isAuthenticated } = useAuth();
+
+  // Hook de direcciones
+  const {
+    addresses,
+    loading: loadingAddresses,
+    selectedAddressId,
+    setSelectedAddressId,
+    mapAddressToShippingData,
+    hasAddresses,
+  } = useShippingAddresses();
+
+  // Estado para mostrar formulario
+  const [showAddressForm, setShowAddressForm] = useState(false);
+
+  // Función para seleccionar dirección
+  const handleSelectAddress = (address) => {
+    setSelectedAddressId(address.id_direccion);
+    const mappedData = mapAddressToShippingData(address);
+    setShippingData(mappedData);
+    setShowAddressForm(false);
+  };
+
+  // Consultar cobertura cada vez que cambian región o comuna (y ambos existen)
   useEffect(() => {
     if (shippingData.regionCode && shippingData.comunaCode) {
       const regionNumber = shippingData.regionCode
@@ -587,14 +614,15 @@ function MultiStepCheckout() {
   };
 
   const validateShippingData = () => {
+    // Si está autenticado y tiene dirección seleccionada, es válido
+    if (isAuthenticated && selectedAddressId) {
+      return true;
+    }
+    
+    // Si no está autenticado o no tiene dirección seleccionada, validar form normal
     const required = [
-      "nombres",
-      "apellidos",
-      "email",
-      "phone",
-      "address",
-      "regionCode",
-      "comunaCode",
+      "nombres", "apellidos", "email", "phone", 
+      "address", "regionCode", "comunaCode"
     ];
     return required.every(
       (field) => shippingData[field] && shippingData[field].trim() !== ""
@@ -618,24 +646,33 @@ function MultiStepCheckout() {
 
   const handleNextStep = () => {
     if (currentStep === 1) {
-      const validation = validateForm(shippingData);
+      // Validar si está usando dirección guardada
+      if (isAuthenticated && selectedAddressId && !showAddressForm) {
+        // Usuario autenticado con dirección seleccionada - validar solo cobertura
+        if (cobertura !== true) {
+          toast.error("Selecciona una comuna con cobertura disponible");
+          return;
+        }
+      } else {
+        // Validar formulario completo
+        const validation = validateForm(shippingData);
 
-      if (!validation.isValid) {
-        toast.error("Por favor, corrige los errores antes de continuar");
+        if (!validation.isValid) {
+          toast.error("Por favor, corrige los errores antes de continuar");
 
-        Object.entries(validation.errors).forEach(([field, message]) => {
-          if (message) {
-            toast.error(`${field}: ${message}`, { duration: 4000 });
-          }
-        });
+          Object.entries(validation.errors).forEach(([field, message]) => {
+            if (message) {
+              toast.error(`${field}: ${message}`, { duration: 4000 });
+            }
+          });
 
-        return;
-      }
+          return;
+        }
 
-      
-      if (cobertura !== true) {
-        toast.error("Selecciona una comuna con cobertura disponible");
-        return;
+        if (cobertura !== true) {
+          toast.error("Selecciona una comuna con cobertura disponible");
+          return;
+        }
       }
     }
 
@@ -815,23 +852,104 @@ function MultiStepCheckout() {
         );
 
       case 1:
-        return (
-          <ShippingForm
-            shippingData={shippingData}
-            setShippingData={setShippingData}
-            cobertura={cobertura}
-            loadingCobertura={loadingCobertura}
-            errorCobertura={errorCobertura}
-            costoEnvio={costoEnvio}
-            servicioDescripcion={servicioDescripcion}
-            loadingEnvio={loadingEnvio}
-            errorEnvio={errorEnvio}
-            errors={errors} 
-            onInputChange={handleInputChange} 
-            onInputBlur={handleInputBlur} 
-            formatPhone={formatPhone} 
-          />
-        );
+        // LÓGICA CONDICIONAL INTEGRADA
+        if (!isAuthenticated) {
+          // Usuario no logueado -> formulario normal con validación
+          return (
+            <ShippingForm
+              shippingData={shippingData}
+              setShippingData={setShippingData}
+              cobertura={cobertura}
+              loadingCobertura={loadingCobertura}
+              errorCobertura={errorCobertura}
+              costoEnvio={costoEnvio}
+              servicioDescripcion={servicioDescripcion}
+              loadingEnvio={loadingEnvio}
+              errorEnvio={errorEnvio}
+              errors={errors} 
+              onInputChange={handleInputChange} 
+              onInputBlur={handleInputBlur} 
+              formatPhone={formatPhone} 
+            />
+          );
+        }
+
+        if (isAuthenticated && !hasAddresses) {
+          // Usuario logueado sin direcciones -> formulario normal con validación
+          return (
+            <div className="space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <p className="text-amber-800 text-sm">
+                  No tienes direcciones guardadas. Completa el formulario para agregar una nueva.
+                </p>
+              </div>
+              <ShippingForm
+                shippingData={shippingData}
+                setShippingData={setShippingData}
+                cobertura={cobertura}
+                loadingCobertura={loadingCobertura}
+                errorCobertura={errorCobertura}
+                costoEnvio={costoEnvio}
+                servicioDescripcion={servicioDescripcion}
+                loadingEnvio={loadingEnvio}
+                errorEnvio={errorEnvio}
+                errors={errors} 
+                onInputChange={handleInputChange} 
+                onInputBlur={handleInputBlur} 
+                formatPhone={formatPhone} 
+              />
+            </div>
+          );
+        }
+
+        if (isAuthenticated && hasAddresses && !showAddressForm) {
+          // Usuario logueado con direcciones -> selector
+          return (
+            <AddressSelector
+              addresses={addresses}
+              selectedAddressId={selectedAddressId}
+              onSelectAddress={handleSelectAddress}
+              onShowForm={() => setShowAddressForm(true)}
+              loading={loadingAddresses}
+            />
+          );
+        }
+
+        if (showAddressForm) {
+          // Mostrar formulario para nueva dirección con validación
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Nueva dirección de envío
+                </h3>
+                <button
+                  onClick={() => setShowAddressForm(false)}
+                  className="text-amber-600 hover:text-amber-700 text-sm font-medium"
+                >
+                  ← Volver a direcciones guardadas
+                </button>
+              </div>
+              <ShippingForm
+                shippingData={shippingData}
+                setShippingData={setShippingData}
+                cobertura={cobertura}
+                loadingCobertura={loadingCobertura}
+                errorCobertura={errorCobertura}
+                costoEnvio={costoEnvio}
+                servicioDescripcion={servicioDescripcion}
+                loadingEnvio={loadingEnvio}
+                errorEnvio={errorEnvio}
+                errors={errors} 
+                onInputChange={handleInputChange} 
+                onInputBlur={handleInputBlur} 
+                formatPhone={formatPhone} 
+              />
+            </div>
+          );
+        }
+
+        break;
 
       case 2:
         return (

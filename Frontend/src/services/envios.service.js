@@ -68,7 +68,10 @@ export const getEnvioPorCompra = async (id_compra) => {
     const response = await axios.get(`/envios/compra/${id_compra}`);
     return { data: response.data, error: null };
   } catch (error) {
-    console.error('Error al obtener envío:', error);
+    // No mostrar error en consola para 404s (envío no encontrado es normal)
+    if (error.response?.status !== 404) {
+      console.error('Error al obtener envío:', error);
+    }
     return { 
       data: null, 
       error: error.response?.data?.message || 'Error al obtener el envío' 

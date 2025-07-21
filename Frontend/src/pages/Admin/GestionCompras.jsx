@@ -111,8 +111,8 @@ const GestionCompras = () => {
   };
 
   // Cargar información de envío para una compra
-  const cargarEnvioCompra = async (id_compra) => {
-    if (enviosData[id_compra]) return; // Ya está cargado
+  const cargarEnvioCompra = async (id_compra, forzarRecarga = false) => {
+    if (enviosData[id_compra] && !forzarRecarga) return; // Ya está cargado y no forzamos recarga
 
     try {
       const { data, error } = await getEnvioPorCompra(id_compra);
@@ -121,9 +121,16 @@ const GestionCompras = () => {
           ...prev,
           [id_compra]: data.data
         }));
+      } else if (error && !error.includes('404')) {
+        // Solo logear errores que no sean 404 (envío no encontrado)
+        console.error('Error al cargar envío:', error);
       }
+      // Para 404s no hacemos nada, es normal que no exista envío aún
     } catch (error) {
-      console.error('Error al cargar envío:', error);
+      // Solo logear errores que no sean 404
+      if (!error.message?.includes('404') && !error.message?.includes('status code 404')) {
+        console.error('Error al cargar envío:', error);
+      }
     }
   };
 
@@ -144,8 +151,8 @@ const GestionCompras = () => {
         alert(`Error al procesar envío: ${error}`);
       } else {
         alert('Orden de transporte creada exitosamente');
-        // Actualizar la información del envío
-        await cargarEnvioCompra(compra.id_compra);
+        // Forzar recarga del envío para mostrar los nuevos datos
+        await cargarEnvioCompra(compra.id_compra, true);
       }
     } catch (error) {
       console.error('Error al procesar envío:', error);
@@ -328,6 +335,7 @@ const GestionCompras = () => {
   // Cargar envíos cuando se cargan las compras
   useEffect(() => {
     if (compras.length > 0) {
+      // Cargar envíos para compras aprobadas, pero de forma silenciosa para 404s
       compras.forEach(compra => {
         if (compra.payment_status === 'approved') {
           cargarEnvioCompra(compra.id_compra);

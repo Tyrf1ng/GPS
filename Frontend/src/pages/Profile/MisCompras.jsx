@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getComprasUsuario } from '../../services/valoraciones.service';
-import { FaShoppingBag, FaCalendar, FaDollarSign, FaStar, FaStarHalfAlt, FaBox, FaTruck } from 'react-icons/fa';
+import { getEnvioPorCompra, getTracking } from '../../services/envios.service';
+import { FaShoppingBag, FaCalendar, FaDollarSign, FaStar, FaStarHalfAlt, FaBox, FaTruck, FaMapMarkerAlt, FaClock, FaCheckCircle, FaInfoCircle, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import ValoracionForm from '../../components/ValoracionForm';
 
 const MisCompras = () => {
@@ -9,6 +10,9 @@ const MisCompras = () => {
   const [compras, setCompras] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [enviosData, setEnviosData] = useState({});
+  const [compraExpandida, setCompraExpandida] = useState(null);
+  const [loadingTracking, setLoadingTracking] = useState({});
 
   useEffect(() => {
     const cargarCompras = async () => {
@@ -34,6 +38,62 @@ const MisCompras = () => {
 
     cargarCompras();
   }, [authUser]);
+
+  // Cargar información de envío para una compra
+  const cargarEnvioCompra = async (id_compra) => {
+    if (enviosData[id_compra]) return; // Ya está cargado
+
+    try {
+      const { data, error } = await getEnvioPorCompra(id_compra);
+      if (!error && data?.data) {
+        setEnviosData(prev => ({
+          ...prev,
+          [id_compra]: data.data
+        }));
+      }
+      // Si no hay envío (404), es normal, no hacer nada
+    } catch (error) {
+      // Error silencioso para 404s
+      if (!error.message?.includes('404')) {
+        console.error('Error al cargar envío:', error);
+      }
+    }
+  };
+
+  // Actualizar tracking de un envío
+  const actualizarTracking = async (id_compra) => {
+    setLoadingTracking(prev => ({ ...prev, [id_compra]: true }));
+
+    try {
+      const { data, error } = await getTracking(id_compra);
+      if (!error && data?.data) {
+        setEnviosData(prev => ({
+          ...prev,
+          [id_compra]: data.data
+        }));
+        alert('Estado de envío actualizado');
+      } else {
+        // Si hay error, mostrar mensaje pero no es crítico
+        alert(`No se pudo actualizar desde Chilexpress, pero aquí tienes la información actual del envío. ${error || ''}`);
+      }
+    } catch (error) {
+      console.error('Error al actualizar tracking:', error);
+      alert('Error al actualizar el estado del envío. La información mostrada es la última disponible.');
+    } finally {
+      setLoadingTracking(prev => ({ ...prev, [id_compra]: false }));
+    }
+  };
+
+  // Cargar envíos para compras aprobadas
+  useEffect(() => {
+    if (compras.length > 0) {
+      compras.forEach(compra => {
+        if (compra.payment_status === 'approved') {
+          cargarEnvioCompra(compra.id_compra);
+        }
+      });
+    }
+  }, [compras]);
 
   const formatearFecha = (fecha) => {
     return new Date(fecha).toLocaleDateString('es-CL', {
@@ -68,6 +128,60 @@ const MisCompras = () => {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getEstadoPagoColor = (estado) => {
+    switch (estado) {
+      case 'approved':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getEstadoPagoTexto = (estado) => {
+    switch (estado) {
+      case 'approved':
+        return 'Pagado';
+      case 'pending':
+        return 'Pendiente';
+      case 'rejected':
+        return 'Rechazado';
+      default:
+        return 'Desconocido';
+    }
+  };
+
+  const getEstadoEnvioInfo = (envio) => {
+    if (!envio) {
+      return {
+        texto: 'Sin procesar',
+        color: 'text-gray-500',
+        icono: FaInfoCircle,
+        descripcion: 'El envío aún no ha sido procesado'
+      };
+    }
+
+    if (envio.transport_order_number) {
+      return {
+        texto: envio.current_status || 'En proceso',
+        color: 'text-blue-600',
+        icono: FaTruck,
+        descripcion: envio.current_location || 'En tránsito',
+        transportOrder: envio.transport_order_number
+      };
+    }
+
+    return {
+      texto: 'Preparando envío',
+      color: 'text-yellow-600',
+      icono: FaBox,
+      descripcion: 'Preparando paquete para despacho'
+    };
   };
 
   if (loading) {
@@ -120,158 +234,220 @@ const MisCompras = () => {
         </div>
       ) : (
         <div className="space-y-8">
-          {compras.map((compra) => (
-            <div key={compra.id_compra} className="bg-white rounded-lg shadow-sm border-gray-400 p-6 flex flex-col gap-4">
-              {/* Header de la compra */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-2">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg font-semibold text-gray-900">Compra #{compra.id_compra}</span>
-                  <span className={`inline-block px-3 py-1 text-xs rounded border font-medium ${getEstadoColor(compra.estado)}`}>{compra.estado}</span>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-gray-500">
-                  <FaCalendar className="w-4 h-4 mr-1" />
-                  {formatearFecha(compra.createdAt)}
-                  <FaDollarSign className="w-4 h-4 ml-4 mr-1" />
-                  {formatearPrecio(compra.total)}
-                </div>
-              </div>
-              {/* Productos resumen */}
-              <div className="flex flex-wrap gap-4">
-                {(compra.productos || []).slice(0, 3).map((producto) => (
-                  <div key={producto.id_producto} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 flex-1 min-w-[220px]">
-                    <img
-                      src={producto.imagen || producto.imagen_producto || '/images/imagenotfound.png'}
-                      alt={producto.nombre_producto}
-                      className="w-16 h-16 object-cover rounded-lg border-gray-300"
-                    />
-                    <div>
-                      <div className="font-medium text-gray-900 text-sm line-clamp-2">{producto.nombre_producto}</div>
-                      <div className="text-xs text-gray-500">Cantidad: {producto.cantidad}</div>
+          {compras.map((compra) => {
+            const envio = enviosData[compra.id_compra];
+            const estadoEnvio = getEstadoEnvioInfo(envio);
+            const esExpandida = compraExpandida === compra.id_compra;
+            
+            return (
+              <div key={compra.id_compra} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                {/* Header de la compra */}
+                <div className="p-6">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg font-semibold text-gray-900">Compra #{compra.id_compra}</span>
+                      <span className={`inline-block px-3 py-1 text-xs rounded border font-medium ${getEstadoPagoColor(compra.payment_status)}`}>
+                        {getEstadoPagoTexto(compra.payment_status)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <div className="flex items-center">
+                        <FaCalendar className="w-4 h-4 mr-1" />
+                        {formatearFecha(compra.createdAt)}
+                      </div>
+                      <div className="flex items-center">
+                        <FaDollarSign className="w-4 h-4 mr-1" />
+                        {formatearPrecio(compra.payment_amount)}
+                      </div>
                     </div>
                   </div>
-                ))}
-                {compra.productos && compra.productos.length > 3 && (
-                  <div className="flex items-center text-xs text-gray-500 ml-2">+{compra.productos.length - 3} más</div>
+
+                  {/* Estado del envío */}
+                  {compra.payment_status === 'approved' && (
+                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <estadoEnvio.icono className={`w-5 h-5 ${estadoEnvio.color}`} />
+                          <div>
+                            <div className={`font-medium ${estadoEnvio.color}`}>{estadoEnvio.texto}</div>
+                            <div className="text-sm text-gray-600">{estadoEnvio.descripcion}</div>
+                            {estadoEnvio.transportOrder && (
+                              <div className="text-xs text-gray-500">Orden de transporte: {estadoEnvio.transportOrder}</div>
+                            )}
+                          </div>
+                        </div>
+                        {envio && envio.transport_order_number && (
+                          <button
+                            onClick={() => actualizarTracking(compra.id_compra)}
+                            disabled={loadingTracking[compra.id_compra]}
+                            className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
+                          >
+                            {loadingTracking[compra.id_compra] ? 'Actualizando...' : 'Actualizar estado'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Productos resumen */}
+                  <div className="flex flex-wrap gap-4 mb-4">
+                    {(compra.productos || []).slice(0, 3).map((producto) => (
+                      <div key={producto.id_producto} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 flex-1 min-w-[220px]">
+                        <img
+                          src={producto.imagen || producto.imagen_producto || '/images/imagenotfound.png'}
+                          alt={producto.nombre_producto}
+                          className="w-16 h-16 object-cover rounded-lg border border-gray-300"
+                        />
+                        <div>
+                          <div className="font-medium text-gray-900 text-sm line-clamp-2">{producto.nombre_producto}</div>
+                          <div className="text-xs text-gray-500">Cantidad: {producto.cantidad}</div>
+                        </div>
+                      </div>
+                    ))}
+                    {compra.productos && compra.productos.length > 3 && (
+                      <div className="flex items-center text-xs text-gray-500 ml-2">+{compra.productos.length - 3} más</div>
+                    )}
+                  </div>
+
+                  {/* Botón de detalles */}
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => setCompraExpandida(esExpandida ? null : compra.id_compra)}
+                      className="flex items-center px-4 py-2 bg-[#A47048] text-white rounded hover:bg-[#8a5a36] font-medium transition-colors"
+                    >
+                      {esExpandida ? 'Ocultar detalles' : 'Ver más detalles'}
+                      {esExpandida ? <FaChevronUp className="ml-2 w-4 h-4" /> : <FaChevronDown className="ml-2 w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sección expandida con detalles completos */}
+                {esExpandida && (
+                  <div className="border-t border-gray-200 p-6 bg-gray-50">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Información detallada de la compra */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Información de la compra</h4>
+                        <div className="space-y-3 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">ID de compra:</span>
+                            <span className="font-medium">#{compra.id_compra}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Estado del pago:</span>
+                            <span className={`px-2 py-1 rounded text-xs ${getEstadoPagoColor(compra.payment_status)}`}>
+                              {getEstadoPagoTexto(compra.payment_status)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Método de pago:</span>
+                            <span className="font-medium">{compra.payment_method || 'No especificado'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Total pagado:</span>
+                            <span className="font-medium text-lg">{formatearPrecio(compra.payment_amount)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Fecha de compra:</span>
+                            <span className="font-medium">{formatearFecha(compra.createdAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Información de envío */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Información de envío</h4>
+                        {compra.payment_status === 'approved' ? (
+                          <div className="space-y-3 text-sm">
+                            {envio ? (
+                              <>
+                                <div className="flex items-center gap-2 mb-3">
+                                  <estadoEnvio.icono className={`w-5 h-5 ${estadoEnvio.color}`} />
+                                  <span className={`font-medium ${estadoEnvio.color}`}>{estadoEnvio.texto}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Estado:</span>
+                                  <span className="font-medium">{envio.current_status || 'En proceso'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Ubicación actual:</span>
+                                  <span className="font-medium">{envio.current_location || 'No disponible'}</span>
+                                </div>
+                                {envio.transport_order_number && (
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600">Orden de transporte:</span>
+                                    <span className="font-mono text-sm bg-gray-200 px-2 py-1 rounded">{envio.transport_order_number}</span>
+                                  </div>
+                                )}
+                                {envio.last_tracking_update && (
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600">Última actualización:</span>
+                                    <span className="font-medium">{formatearFecha(envio.last_tracking_update)}</span>
+                                  </div>
+                                )}
+                                {envio.delivered_date && (
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600">Fecha de entrega:</span>
+                                    <span className="font-medium text-green-600">{formatearFecha(envio.delivered_date)}</span>
+                                  </div>
+                                )}
+                                {envio.delivered_to && (
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600">Entregado a:</span>
+                                    <span className="font-medium">{envio.delivered_to}</span>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="text-gray-600">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <FaInfoCircle className="w-4 h-4" />
+                                  <span>Envío aún no procesado</span>
+                                </div>
+                                <p className="text-sm">Tu pago ha sido confirmado. El envío será procesado pronto.</p>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-gray-600">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FaInfoCircle className="w-4 h-4" />
+                              <span>Esperando confirmación de pago</span>
+                            </div>
+                            <p className="text-sm">Una vez confirmado el pago, procesaremos tu envío.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Lista detallada de productos */}
+                    <div className="mt-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Productos en esta compra</h4>
+                      <div className="space-y-3">
+                        {(compra.productos || []).map((producto) => (
+                          <div key={producto.id_producto} className="flex items-center gap-4 bg-white rounded-lg p-4 border border-gray-200">
+                            <img
+                              src={producto.imagen || producto.imagen_producto || '/images/imagenotfound.png'}
+                              alt={producto.nombre_producto}
+                              className="w-16 h-16 object-cover rounded-lg border border-gray-300"
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{producto.nombre_producto}</div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                Cantidad: {producto.cantidad} × {formatearPrecio(producto.precio_unitario)} = {formatearPrecio(producto.cantidad * producto.precio_unitario)}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
-              {/* Botón de detalles */}
-              <div className="flex justify-end mt-2">
-                <button
-                  className="px-4 py-2 bg-[#A47048] text-white rounded hover:bg-[#8a5a36] font-medium transition-colors"
-                  // onClick={() => navigate(`/profile/mis-compras/${compra.id_compra}`)}
-                >
-                  Ver más detalles
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
-    </div>
-  );
-};
-
-// Componente para mostrar una compra individual con sus productos
-const CompraCard = ({ compra, formatearFecha, formatearPrecio, getEstadoColor, getEstadoIcon }) => {
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-      {/* Header de la compra */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-2">
-              <h3 className="text-xl font-semibold text-gray-900">
-                Compra #{compra.id_compra}
-              </h3>
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getEstadoColor(compra.estado)}`}>
-                {getEstadoIcon(compra.estado)}
-                <span className="ml-1 capitalize">{compra.estado}</span>
-              </span>
-            </div>
-            <div className="flex items-center text-sm text-gray-500">
-              <FaCalendar className="w-4 h-4 mr-2" />
-              {formatearFecha(compra.createdAt)}
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="flex items-center text-2xl font-bold text-gray-900">
-              <FaDollarSign className="w-5 h-5 mr-1" />
-              {formatearPrecio(compra.total)}
-            </div>
-            <div className="text-sm text-gray-500 mt-1">
-              {compra.productos?.length || 0} producto{compra.productos?.length !== 1 ? 's' : ''}
-            </div>
-          </div>
-        </div>
-
-        {/* Información adicional de la compra */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-          <div>
-            <span className="font-medium">Facturación:</span> {compra.facturacion}
-          </div>
-          <div>
-            <span className="font-medium">Método de pago:</span> {compra.metodo_pago || 'No especificado'}
-          </div>
-        </div>
-      </div>
-
-      {/* Productos de la compra */}
-      <div className="p-6">
-        <h4 className="text-lg font-semibold text-gray-900 mb-4">Productos de esta compra</h4>
-        
-        {compra.productos && compra.productos.length > 0 ? (
-          <div className="space-y-4">
-                         {compra.productos.map((producto) => (
-               <ProductoCompra 
-                 key={`${compra.id_compra}-${producto.id_producto}`}
-                 producto={producto}
-                 formatearPrecio={formatearPrecio}
-               />
-             ))}
-          </div>
-        ) : (
-          <div className="text-center text-gray-500 py-4">
-            <p>No se encontraron productos en esta compra.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Componente para mostrar un producto individual dentro de una compra
-const ProductoCompra = ({ producto, formatearPrecio }) => {
-  // Mostrar solo información básica del producto, sin valoraciones
-  return (
-    <div className="border border-gray-200 rounded-lg p-4">
-      <div className="flex items-start space-x-4">
-        {/* Imagen del producto */}
-        <div className="flex-shrink-0">
-          <img
-            src={producto.imagen || '/images/imagenotfound.png'}
-            alt={producto.nombre_producto}
-            className="w-20 h-20 object-cover rounded-lg"
-            onError={(e) => {
-              e.target.src = '/images/imagenotfound.png';
-            }}
-          />
-        </div>
-        {/* Información del producto */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h5 className="text-lg font-semibold text-gray-900 mb-1">
-                {producto.nombre_producto}
-              </h5>
-              <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
-                <span>Cantidad: {producto.cantidad}</span>
-                <span>Precio unitario: {formatearPrecio(producto.precio_unitario)}</span>
-                <span>Total: {formatearPrecio(producto.precio_unitario * producto.cantidad)}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

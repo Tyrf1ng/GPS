@@ -14,9 +14,6 @@ const COMPANY_CONFIG = {
 
 /**
  * Crea una orden de transporte en Chilexpress
- * @param {number} id_compra - ID de la compra
- * @param {Object} shippingData - Datos de envío (servicio, cobertura, etc.)
- * @returns {Promise<[Object, string]>} - [data, error]
  */
 export async function createTransportOrder(id_compra, shippingData) {
     try {
@@ -129,7 +126,6 @@ export async function createTransportOrder(id_compra, shippingData) {
             return [null, result.statusDescription || "Error al crear orden de transporte"];
         }
 
-        // Guardar información del envío en la base de datos
         const envioData = {
             id_compra,
             estado: "procesando",
@@ -162,8 +158,6 @@ export async function createTransportOrder(id_compra, shippingData) {
 
 /**
  * Consulta el tracking de un envío
- * @param {string} transportOrderNumber - Número de orden de transporte
- * @returns {Promise<[Object, string]>} - [trackingData, error]
  */
 export async function getTrackingInfo(transportOrderNumber) {
     try {
@@ -199,8 +193,6 @@ export async function getTrackingInfo(transportOrderNumber) {
 
 /**
  * Actualiza el estado de tracking de un envío en la base de datos
- * @param {number} id_compra - ID de la compra
- * @returns {Promise<[Object, string]>} - [envioActualizado, error]
  */
 export async function updateTrackingStatus(id_compra) {
     try {
@@ -209,35 +201,43 @@ export async function updateTrackingStatus(id_compra) {
             where: { id_compra }
         });
 
-        if (!envio || !envio.transport_order_number) {
-            return [null, "Envío no encontrado o sin orden de transporte"];
+        if (!envio) {
+            return [null, "Envío no encontrado"];
+        }
+
+        if (!envio.transport_order_number) {
+            return [envio, null];
         }
 
         const [trackingData, error] = await getTrackingInfo(envio.transport_order_number);
 
         if (error) {
-            return [null, error];
+            return [envio, null];
         }
 
-        const updateData = {
-            current_status: trackingData.transportOrderData?.status,
-            current_location: trackingData.transportOrderData?.locationStatus,
-            last_tracking_update: new Date()
-        };
+        if (trackingData) {
+            const updateData = {
+                current_status: trackingData.transportOrderData?.status || envio.current_status,
+                current_location: trackingData.transportOrderData?.locationStatus || envio.current_location,
+                last_tracking_update: new Date()
+            };
 
-        if (trackingData.deliveryData) {
-            updateData.delivered_date = new Date(trackingData.deliveryData.deliveryDateTime);
-            updateData.delivered_to = trackingData.deliveryData.receptorName;
-            updateData.estado = "entregado";
+            if (trackingData.deliveryData) {
+                updateData.delivered_date = new Date(trackingData.deliveryData.deliveryDateTime);
+                updateData.delivered_to = trackingData.deliveryData.receptorName;
+                updateData.estado = "entregado";
+            }
+
+            await envioRepository.update({ id_compra }, updateData);
+
+            const envioActualizado = await envioRepository.findOne({
+                where: { id_compra }
+            });
+
+            return [{ ...envioActualizado, trackingEvents: trackingData.trackingEvents }, null];
         }
 
-        await envioRepository.update({ id_compra }, updateData);
-
-        const envioActualizado = await envioRepository.findOne({
-            where: { id_compra }
-        });
-
-        return [{ ...envioActualizado, trackingEvents: trackingData.trackingEvents }, null];
+        return [envio, null];
 
     } catch (error) {
         console.error("Error al actualizar tracking:", error);

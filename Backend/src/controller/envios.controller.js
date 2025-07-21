@@ -47,7 +47,6 @@ export async function getTrackingController(req, res) {
     try {
         const { id_compra } = req.params;
 
-        // Actualizar tracking desde Chilexpress
         const [envioActualizado, error] = await updateTrackingStatus(id_compra);
 
         if (error) {

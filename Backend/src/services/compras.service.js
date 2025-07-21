@@ -10,7 +10,7 @@ export async function getComprasUsuario(id_usuario) {
         const comprasRepository = AppDataSource.getRepository(Compras);
         const compras = await comprasRepository.find({
             where: { id_usuario: parseInt(id_usuario) },
-            relations: ["Usuarios"],
+            relations: ["Usuario"],
             order: { createdAt: "DESC" }
         });
 
@@ -40,6 +40,10 @@ export async function getComprasUsuario(id_usuario) {
 
                 return {
                     ...compra,
+                    total: parseFloat(compra.payment_amount) || 0, // Asegurar que sea un número
+                    estado: compra.payment_status || 'pendiente', // Mapear payment_status a estado
+                    facturacion: compra.payment_type || 'No especificado', // Usar payment_type o valor por defecto
+                    metodo_pago: compra.payment_type || 'No especificado', // Usar payment_type para método de pago
                     productos
                 };
             })

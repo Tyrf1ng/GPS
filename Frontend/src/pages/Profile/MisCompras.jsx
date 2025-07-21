@@ -46,10 +46,15 @@ const MisCompras = () => {
   };
 
   const formatearPrecio = (precio) => {
+    // Manejar valores undefined, null o no numéricos
+    const valor = parseFloat(precio);
+    if (isNaN(valor)) {
+      return '$0';
+    }
     return new Intl.NumberFormat('es-CL', {
       style: 'currency',
       currency: 'CLP'
-    }).format(precio);
+    }).format(valor);
   };
 
   const getEstadoColor = (estado) => {

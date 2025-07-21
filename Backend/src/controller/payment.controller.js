@@ -13,23 +13,30 @@ const compraTemporalService = new CompraTemporalService();
 
 export const createPreference = async (req, res) => {
   try {
-    const { items, external_reference, shipping_info, datosPersonales } = req.body;
+    const { items, external_reference, shipping_info, datosPersonales, costoEnvio, servicioEnvio } = req.body;
 
-    // ✅ Log detallado de shipping_info para debug
+    // ✅ Log detallado para debug
     console.log('🚚 DEBUG shipping_info completo:', JSON.stringify(shipping_info, null, 2));
+    console.log('🚚 DEBUG datosPersonales:', JSON.stringify(datosPersonales, null, 2));
+    console.log('🚚 DEBUG costoEnvio:', costoEnvio);
+    console.log('🚚 DEBUG servicioEnvio:', servicioEnvio);
+    
+    // ✅ Determinar datos personales (pueden venir en shipping_info o datosPersonales)
+    const datosPersonalesReales = datosPersonales || (shipping_info?.nombres ? shipping_info : null);
     
     // ✅ Preparar items incluyendo envío si corresponde
     let finalItems = [...items];
     
-    // ✅ Agregar costo de envío como item si existe
-    // Verificar múltiples formatos posibles del shipping_info
-    const shippingCost = shipping_info?.costo || 
+    // ✅ Buscar información de envío en múltiples ubicaciones
+    const shippingCost = costoEnvio || 
+                        shipping_info?.costo || 
                         shipping_info?.cost || 
                         shipping_info?.precio || 
                         shipping_info?.serviceValue ||
                         0;
     
-    const shippingDescription = shipping_info?.descripcion || 
+    const shippingDescription = servicioEnvio ||
+                               shipping_info?.descripcion || 
                                shipping_info?.description || 
                                shipping_info?.servicio ||
                                shipping_info?.serviceDescription ||
@@ -47,25 +54,24 @@ export const createPreference = async (req, res) => {
       console.log(`📦 Envío agregado: ${shippingDescription} - $${shippingCost}`);
     } else {
       console.log('⚠️ No se encontró información válida de envío para agregar');
+      console.log('Valores buscados:', { costoEnvio, shippingCost, shippingDescription });
     }
 
     console.log('🔍 Datos recibidos en createPreference:', {
       items: items?.length || 0,
       finalItems: finalItems?.length || 0,
       external_reference,
-      shipping_info: shipping_info ? {
-        descripcion: shipping_info.descripcion,
-        costo: shipping_info.costo
-      } : null,
-      datosPersonales: !!datosPersonales,
+      shippingCost,
+      shippingDescription,
+      datosPersonalesReales: !!datosPersonalesReales,
       costoTotal: finalItems.reduce((total, item) => total + (item.unit_price * item.quantity), 0)
     });
 
     // ✅ NUEVO: Validar datos personales si están presentes
-    if (datosPersonales) {
-      console.log('🔧 Validando datos personales:', datosPersonales);
+    if (datosPersonalesReales) {
+      console.log('🔧 Validando datos personales:', datosPersonalesReales);
       
-      const { error } = checkoutFormValidation.validate(datosPersonales);
+      const { error } = checkoutFormValidation.validate(datosPersonalesReales);
       
       if (error) {
         console.error('❌ Errores de validación:', error.details);
@@ -105,8 +111,12 @@ export const createPreference = async (req, res) => {
 
     // ✅ Guardar compra temporal (con datos validados + info de envío)
     const datosCompletos = {
-      ...datosPersonales,
-      shipping_info: shipping_info || null
+      ...datosPersonalesReales,
+      shipping_info: {
+        costo: shippingCost,
+        descripcion: shippingDescription,
+        original: shipping_info // Guardar original para debug
+      }
     };
     
     await compraTemporalService.saveCompraTemporal(
@@ -140,21 +150,23 @@ export const createPreference = async (req, res) => {
         reserva_id: external_reference,
         fecha_creacion: new Date().toISOString(),
         tiempo_limite_minutos: 15,
-        datos_validados: !!datosPersonales
+        datos_validados: !!datosPersonalesReales,
+        costo_envio: shippingCost || 0,
+        servicio_envio: shippingDescription
       },
 
       // ✅ NUEVO: Información del comprador si está disponible
-      ...(datosPersonales && {
+      ...(datosPersonalesReales && {
         payer: {
-          name: datosPersonales.nombres,
-          surname: datosPersonales.apellidos,
-          email: datosPersonales.email,
+          name: datosPersonalesReales.nombres || datosPersonalesReales.name,
+          surname: datosPersonalesReales.apellidos || datosPersonalesReales.surname,
+          email: datosPersonalesReales.email,
           phone: {
-            number: datosPersonales.phone?.replace('+56', '') || ''
+            number: (datosPersonalesReales.phone || datosPersonalesReales.telefono || '')?.replace('+56', '') || ''
           },
           address: {
-            street_name: datosPersonales.address || '',
-            zip_code: datosPersonales.postalCode || ''
+            street_name: datosPersonalesReales.address || '',
+            zip_code: datosPersonalesReales.postalCode || ''
           }
         }
       })

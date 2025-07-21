@@ -26,6 +26,29 @@ export class PaymentService {
 
       let direccionGuardada = null;
       if (!usuarioInvitado) {
+        // ✅ NUEVO: Primero crear usuario sin dirección
+        const baseName = (datosPersonales.nombres || datosPersonales.name || "Invitado").replace(/\s+/g, '');
+        const invitadoNamePrefix = `${baseName}_invitado_`;
+
+        const existingInvitados = await usuarioRepository
+          .createQueryBuilder("usuario")
+          .where("usuario.nombreCompleto LIKE :prefix", { prefix: `${invitadoNamePrefix}%` })
+          .getCount();
+
+        const nuevoNombre = `${invitadoNamePrefix}${existingInvitados + 1}`;
+
+        // Crear usuario sin dirección primero
+        usuarioInvitado = usuarioRepository.create({
+          nombreCompleto: `${datosPersonales.nombres || datosPersonales.name || 'Invitado'} ${datosPersonales.apellidos || datosPersonales.surname || 'Usuario'}` || nuevoNombre,
+          email: emailForm,
+          telefono: datosPersonales.phone || datosPersonales.telefono || "",
+          password: "null",
+          rol: "invitado",
+          id_direccion: null // Temporal
+        });
+        usuarioInvitado = await usuarioRepository.save(usuarioInvitado);
+
+        // ✅ NUEVO: Ahora crear dirección con el id_usuario
         const direccionCompleta = datosPersonales.address || "Dirección no especificada";
         
         // Intentar parsear dirección completa en calle y número
@@ -39,31 +62,16 @@ export class PaymentService {
           comuna: datosPersonales.ciudad || datosPersonales.comunaCode || "Comuna no especificada",
           region: datosPersonales.region || datosPersonales.regionCode || "Región no especificada",
           codigo_postal: datosPersonales.postalCode || "00000",
-          tipo_de_direccion: "predeterminada"
+          tipo_de_direccion: "predeterminada",
+          id_usuario: usuarioInvitado.id_usuario // ✅ Agregar id_usuario
         };
         
         console.log('🏠 Creando dirección:', direccionData);
         direccionGuardada = await direccionRepository.save(direccionData);
 
-        const baseName = (datosPersonales.nombres || datosPersonales.name || "Invitado").replace(/\s+/g, '');
-        const invitadoNamePrefix = `${baseName}_invitado_`;
-
-        const existingInvitados = await usuarioRepository
-          .createQueryBuilder("usuario")
-          .where("usuario.nombreCompleto LIKE :prefix", { prefix: `${invitadoNamePrefix}%` })
-          .getCount();
-
-        const nuevoNombre = `${invitadoNamePrefix}${existingInvitados + 1}`;
-
-        usuarioInvitado = usuarioRepository.create({
-          nombreCompleto: `${datosPersonales.nombres || datosPersonales.name || 'Invitado'} ${datosPersonales.apellidos || datosPersonales.surname || 'Usuario'}` || nuevoNombre,
-          email: emailForm,
-          telefono: datosPersonales.phone || datosPersonales.telefono || "",
-          password: "null",
-          rol: "invitado",
-          id_direccion: direccionGuardada.id_direccion
-        });
-        usuarioInvitado = await usuarioRepository.save(usuarioInvitado);
+        // ✅ NUEVO: Actualizar usuario con la dirección
+        usuarioInvitado.id_direccion = direccionGuardada.id_direccion;
+        await usuarioRepository.save(usuarioInvitado);
       }
 
       const idUsuario = usuarioInvitado.id_usuario;

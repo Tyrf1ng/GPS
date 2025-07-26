@@ -93,13 +93,6 @@ function Navbar({ isOpen, setOpen }) {
                     >
                       <FaStar className="text-orange-400" /> Mis Valoraciones
                     </Link>
-                    <Link
-                      to="/profile/mis-pedidos"
-                      className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 transition text-sm"
-                      onClick={() => setDropdownOpen(false)}
-                    >
-                      <FaBus className="text-orange-400" /> Mis Pedidos
-                    </Link>
                     
                     {/* Opciones de administrador */}
                     {isAdmin && (

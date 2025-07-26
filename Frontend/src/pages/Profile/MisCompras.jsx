@@ -39,9 +39,8 @@ const MisCompras = () => {
     cargarCompras();
   }, [authUser]);
 
-  // Cargar información de envío para una compra
   const cargarEnvioCompra = async (id_compra) => {
-    if (enviosData[id_compra]) return; // Ya está cargado
+    if (enviosData[id_compra]) return; 
 
     try {
       const { data, error } = await getEnvioPorCompra(id_compra);
@@ -51,16 +50,13 @@ const MisCompras = () => {
           [id_compra]: data.data
         }));
       }
-      // Si no hay envío (404), es normal, no hacer nada
     } catch (error) {
-      // Error silencioso para 404s
       if (!error.message?.includes('404')) {
         console.error('Error al cargar envío:', error);
       }
     }
   };
 
-  // Actualizar tracking de un envío
   const actualizarTracking = async (id_compra) => {
     setLoadingTracking(prev => ({ ...prev, [id_compra]: true }));
 
@@ -73,7 +69,6 @@ const MisCompras = () => {
         }));
         alert('Estado de envío actualizado');
       } else {
-        // Si hay error, mostrar mensaje pero no es crítico
         alert(`No se pudo actualizar desde Chilexpress, pero aquí tienes la información actual del envío. ${error || ''}`);
       }
     } catch (error) {
@@ -84,7 +79,6 @@ const MisCompras = () => {
     }
   };
 
-  // Cargar envíos para compras aprobadas
   useEffect(() => {
     if (compras.length > 0) {
       compras.forEach(compra => {
@@ -106,7 +100,6 @@ const MisCompras = () => {
   };
 
   const formatearPrecio = (precio) => {
-    // Manejar valores undefined, null o no numéricos
     const valor = parseFloat(precio);
     if (isNaN(valor)) {
       return '$0';
@@ -211,7 +204,6 @@ const MisCompras = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header */}
       <div className="mb-8">
         <h2 className="text-3xl font-bold mb-2">Mis Compras</h2>
         <p className="text-gray-500">Revisa el historial de tus compras realizadas</p>
@@ -228,6 +220,7 @@ const MisCompras = () => {
           <a
             href="/catalogo"
             className="inline-flex items-center px-6 py-3 bg-yellow-600 text-white font-medium rounded-lg hover:bg-yellow-700 transition-colors"
+            style={{ color: '#ffff  ' }}
           >
             <FaShoppingBag className="w-5 h-5 mr-2" /> Ir al catálogo
           </a>
@@ -241,7 +234,6 @@ const MisCompras = () => {
             
             return (
               <div key={compra.id_compra} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                {/* Header de la compra */}
                 <div className="p-6">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                     <div className="flex items-center gap-3">
@@ -262,7 +254,6 @@ const MisCompras = () => {
                     </div>
                   </div>
 
-                  {/* Estado del envío */}
                   {compra.payment_status === 'approved' && (
                     <div className="bg-gray-50 rounded-lg p-4 mb-4">
                       <div className="flex items-center justify-between">
@@ -289,7 +280,6 @@ const MisCompras = () => {
                     </div>
                   )}
 
-                  {/* Productos resumen */}
                   <div className="flex flex-wrap gap-4 mb-4">
                     {(compra.productos || []).slice(0, 3).map((producto) => (
                       <div key={producto.id_producto} className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 flex-1 min-w-[220px]">
@@ -309,7 +299,6 @@ const MisCompras = () => {
                     )}
                   </div>
 
-                  {/* Botón de detalles */}
                   <div className="flex justify-end">
                     <button
                       onClick={() => setCompraExpandida(esExpandida ? null : compra.id_compra)}
@@ -321,11 +310,9 @@ const MisCompras = () => {
                   </div>
                 </div>
 
-                {/* Sección expandida con detalles completos */}
                 {esExpandida && (
                   <div className="border-t border-gray-200 p-6 bg-gray-50">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Información detallada de la compra */}
                       <div>
                         <h4 className="text-lg font-semibold text-gray-900 mb-4">Información de la compra</h4>
                         <div className="space-y-3 text-sm">
@@ -354,7 +341,6 @@ const MisCompras = () => {
                         </div>
                       </div>
 
-                      {/* Información de envío */}
                       <div>
                         <h4 className="text-lg font-semibold text-gray-900 mb-4">Información de envío</h4>
                         {compra.payment_status === 'approved' ? (
@@ -420,7 +406,6 @@ const MisCompras = () => {
                       </div>
                     </div>
 
-                    {/* Lista detallada de productos */}
                     <div className="mt-6">
                       <h4 className="text-lg font-semibold text-gray-900 mb-4">Productos en esta compra</h4>
                       <div className="space-y-3">

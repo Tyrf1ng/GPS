@@ -13,21 +13,17 @@ const GestionCompras = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
   
-  // Estados para ordenamiento
-  const [sortOrder, setSortOrder] = useState('newest'); // 'newest', 'oldest'
+  const [sortOrder, setSortOrder] = useState('newest'); 
   
-  // Estados para paginación
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   
-  // Estados para gestión de envíos
   const [enviosData, setEnviosData] = useState({});
   const [loadingEnvio, setLoadingEnvio] = useState(false);
   const [processingShipment, setProcessingShipment] = useState(null);
   const [selectedCompra, setSelectedCompra] = useState(null);
   const [showEnvioModal, setShowEnvioModal] = useState(false);
 
-  // Verificar si el usuario es administrador (puede ser 'admin' o 'administrador')
   const isAdmin = authUser?.rol === 'admin' || authUser?.rol === 'administrador';
 
   useEffect(() => {
@@ -57,11 +53,9 @@ const GestionCompras = () => {
     cargarCompras();
   }, [authUser, isAdmin]);
 
-  // Filtrar y ordenar compras según búsqueda, filtros y ordenamiento
   useEffect(() => {
     let comprasFiltradas = [...compras];
 
-    // Filtrar por término de búsqueda
     if (searchTerm) {
       comprasFiltradas = comprasFiltradas.filter(compra => 
         compra.id_compra.toString().includes(searchTerm) ||
@@ -71,30 +65,27 @@ const GestionCompras = () => {
       );
     }
 
-    // Filtrar por estado
     if (statusFilter !== 'todos') {
       comprasFiltradas = comprasFiltradas.filter(compra => 
         compra.payment_status === statusFilter
       );
     }
 
-    // Ordenar por fecha
     comprasFiltradas.sort((a, b) => {
       const fechaA = new Date(a.createdAt);
       const fechaB = new Date(b.createdAt);
       
       if (sortOrder === 'newest') {
-        return fechaB - fechaA; // Más nuevas primero
+        return fechaB - fechaA; 
       } else {
-        return fechaA - fechaB; // Más antiguas primero
+        return fechaA - fechaB; 
       }
     });
 
     setComprasFilteredData(comprasFiltradas);
-    setCurrentPage(1); // Reset página al cambiar filtros
+    setCurrentPage(1); 
   }, [compras, searchTerm, statusFilter, sortOrder]);
 
-  // Calcular datos para paginación
   const totalPages = Math.ceil(comprasFilteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -110,9 +101,8 @@ const GestionCompras = () => {
     setCurrentPage(1);
   };
 
-  // Cargar información de envío para una compra
   const cargarEnvioCompra = async (id_compra, forzarRecarga = false) => {
-    if (enviosData[id_compra] && !forzarRecarga) return; // Ya está cargado y no forzamos recarga
+    if (enviosData[id_compra] && !forzarRecarga) return; 
 
     try {
       const { data, error } = await getEnvioPorCompra(id_compra);
@@ -122,28 +112,22 @@ const GestionCompras = () => {
           [id_compra]: data.data
         }));
       } else if (error && !error.includes('404')) {
-        // Solo logear errores que no sean 404 (envío no encontrado)
         console.error('Error al cargar envío:', error);
       }
-      // Para 404s no hacemos nada, es normal que no exista envío aún
     } catch (error) {
-      // Solo logear errores que no sean 404
       if (!error.message?.includes('404') && !error.message?.includes('status code 404')) {
         console.error('Error al cargar envío:', error);
       }
     }
   };
 
-  // Procesar envío (crear orden de transporte)
   const handleProcesarEnvio = async (compra) => {
     setProcessingShipment(compra.id_compra);
     setLoadingEnvio(true);
 
     try {
-      // Aquí deberías determinar el serviceCode y destinationCoverage
-      // Por ahora usaremos valores por defecto
-      const serviceCode = "3"; // Express
-      const destinationCoverage = "STGO"; // Santiago (deberías mapear esto desde la dirección)
+      const serviceCode = "3"; 
+      const destinationCoverage = "STGO"; 
 
       const { data, error } = await procesarEnvio(compra.id_compra, serviceCode, destinationCoverage);
 
@@ -151,7 +135,6 @@ const GestionCompras = () => {
         alert(`Error al procesar envío: ${error}`);
       } else {
         alert('Orden de transporte creada exitosamente');
-        // Forzar recarga del envío para mostrar los nuevos datos
         await cargarEnvioCompra(compra.id_compra, true);
       }
     } catch (error) {
@@ -163,7 +146,6 @@ const GestionCompras = () => {
     }
   };
 
-  // Función para ver etiqueta en nueva ventana
   const handleVerEtiqueta = async (transportOrderNumber) => {
     try {
       const response = await reimprimirEtiqueta(transportOrderNumber);
@@ -174,11 +156,9 @@ const GestionCompras = () => {
         const etiquetaData = response.data?.data || response.data;
         
         if (etiquetaData?.labelData) {
-          // Detectar el tipo de archivo basado en el inicio del base64
           const labelData = etiquetaData.labelData;
-          let mimeType = 'image/jpeg'; // Por defecto JPEG
+          let mimeType = 'image/jpeg';
           
-          // Detectar tipo de archivo
           if (labelData.startsWith('/9j/')) {
             mimeType = 'image/jpeg';
           } else if (labelData.startsWith('iVBORw0KGgo')) {
@@ -187,7 +167,6 @@ const GestionCompras = () => {
             mimeType = 'application/pdf';
           }
           
-          // Crear blob con el tipo correcto
           const byteCharacters = atob(labelData);
           const byteNumbers = new Array(byteCharacters.length);
           
@@ -199,7 +178,6 @@ const GestionCompras = () => {
           const blob = new Blob([byteArray], { type: mimeType });
           const url = window.URL.createObjectURL(blob);
           
-          // Abrir en nueva ventana
           const newWindow = window.open('', '_blank');
           if (newWindow) {
             const fileExtension = mimeType === 'application/pdf' ? 'pdf' : 'jpg';
@@ -272,7 +250,6 @@ const GestionCompras = () => {
     }
   };
 
-  // Reimprimir etiqueta
   const handleReimprimirEtiqueta = async (transportOrderNumber) => {
     try {
       const response = await reimprimirEtiqueta(transportOrderNumber);
@@ -282,11 +259,9 @@ const GestionCompras = () => {
       } else {
         const etiquetaData = response.data?.data || response.data;
         
-        // Crear y descargar la etiqueta
         if (etiquetaData?.labelData) {
           const labelData = etiquetaData.labelData;
           
-          // Detectar el tipo de archivo
           let mimeType = 'image/jpeg';
           let fileExtension = 'jpg';
           
@@ -311,7 +286,6 @@ const GestionCompras = () => {
           const byteArray = new Uint8Array(byteNumbers);
           const blob = new Blob([byteArray], { type: mimeType });
           
-          // Crear enlace de descarga
           const url = window.URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
@@ -332,10 +306,8 @@ const GestionCompras = () => {
     }
   };
 
-  // Cargar envíos cuando se cargan las compras
   useEffect(() => {
     if (compras.length > 0) {
-      // Cargar envíos para compras aprobadas, pero de forma silenciosa para 404s
       compras.forEach(compra => {
         if (compra.payment_status === 'approved') {
           cargarEnvioCompra(compra.id_compra);
@@ -391,7 +363,6 @@ const GestionCompras = () => {
     }
   };
 
-  // Estadísticas básicas
   const stats = {
     total: compras.length,
     aprobadas: compras.filter(c => c.payment_status === 'approved').length,
@@ -441,13 +412,10 @@ const GestionCompras = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestión de Compras</h1>
           <p className="text-gray-600">Administra todas las compras realizadas en la plataforma</p>
         </div>
-
-        {/* Estadísticas */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center">
@@ -499,11 +467,8 @@ const GestionCompras = () => {
             </div>
           </div>
         </div>
-
-        {/* Filtros y búsqueda */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex flex-col lg:flex-row gap-4">
-            {/* Búsqueda */}
             <div className="flex-1">
               <div className="relative">
                 <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -516,8 +481,6 @@ const GestionCompras = () => {
                 />
               </div>
             </div>
-
-            {/* Filtro por estado */}
             <div className="lg:w-48">
               <select
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
@@ -530,8 +493,6 @@ const GestionCompras = () => {
                 <option value="rejected">Rechazadas</option>
               </select>
             </div>
-
-            {/* Ordenamiento */}
             <div className="lg:w-48">
               <select
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
@@ -542,15 +503,8 @@ const GestionCompras = () => {
                 <option value="oldest">Más antiguas </option>
               </select>
             </div>
-
-            {/* Botón exportar */}
-            <button className="flex items-center px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors">
-              <FaDownload className="mr-2" />
-              Exportar
-            </button>
           </div>
 
-          {/* Selector de elementos por página */}
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>Mostrar:</span>
@@ -578,7 +532,6 @@ const GestionCompras = () => {
           </div>
         </div>
 
-        {/* Lista de compras */}
         {comprasFilteredData.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
             <FaShoppingBag className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -597,11 +550,9 @@ const GestionCompras = () => {
           </div>
         ) : (
           <>
-            {/* Compras paginadas */}
             <div className="space-y-6">
               {currentCompras.map((compra) => (
                 <div key={compra.id_compra} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  {/* Header de la compra */}
                   <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
                     <div className="flex items-center gap-3">
                       <span className="text-xl font-semibold text-gray-900">
@@ -623,7 +574,6 @@ const GestionCompras = () => {
                     </div>
                   </div>
 
-                  {/* Información del cliente */}
                   <div className="bg-blue-50 rounded-lg p-4 border border-blue-200 mb-6">
                     <div className="flex items-center gap-2 mb-3">
                       <FaUser className="w-4 h-4 text-blue-600" />
@@ -649,7 +599,6 @@ const GestionCompras = () => {
                     </div>
                   </div>
 
-                  {/* Productos */}
                   <div>
                     <h4 className="font-medium text-gray-900 mb-3">Productos comprados:</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -680,7 +629,6 @@ const GestionCompras = () => {
                     </div>
                   </div>
 
-                  {/* Información adicional */}
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                       <div>
@@ -698,7 +646,6 @@ const GestionCompras = () => {
                     </div>
                   </div>
 
-                  {/* Gestión de Envíos - Solo para compras aprobadas */}
                   {compra.payment_status === 'approved' && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <div className="flex items-center gap-2 mb-4">
@@ -707,7 +654,6 @@ const GestionCompras = () => {
                       </div>
                       
                       {enviosData[compra.id_compra] && enviosData[compra.id_compra].transport_order_number ? (
-                        // Envío ya procesado con orden de transporte
                         <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
                             <div>
@@ -765,7 +711,6 @@ const GestionCompras = () => {
                           </div>
                         </div>
                       ) : enviosData[compra.id_compra] && enviosData[compra.id_compra].estado === 'pendiente' ? (
-                        // Envío existe pero está pendiente (sin orden de transporte)
                         <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
                           <div className="flex items-center justify-between">
                             <div>
@@ -794,7 +739,6 @@ const GestionCompras = () => {
                           </div>
                         </div>
                       ) : (
-                        // No hay envío registrado - mostrar botón para procesar
                         <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
                           <div className="flex items-center justify-between">
                             <div>
@@ -829,7 +773,6 @@ const GestionCompras = () => {
               ))}
             </div>
 
-            {/* Controles de paginación */}
             {totalPages > 1 && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mt-6">
                 <div className="flex items-center justify-between">
@@ -838,7 +781,6 @@ const GestionCompras = () => {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    {/* Botón anterior */}
                     <button
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
@@ -848,10 +790,8 @@ const GestionCompras = () => {
                       Anterior
                     </button>
 
-                    {/* Números de página */}
                     <div className="flex gap-1">
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                        // Mostrar solo páginas relevantes
                         if (
                           page === 1 || 
                           page === totalPages || 
@@ -884,7 +824,6 @@ const GestionCompras = () => {
                       })}
                     </div>
 
-                    {/* Botón siguiente */}
                     <button
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}

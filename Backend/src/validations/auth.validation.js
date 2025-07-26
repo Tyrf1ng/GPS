@@ -86,7 +86,7 @@ export const direccionValidation = Joi.object({
       "string.empty": "El número no puede estar vacío",
       "string.base": "El número debe ser una cadena de texto",
     }),
-  comuna: Joi.string()  // NUEVA VALIDACIÓN
+  comuna: Joi.string()
     .min(2)
     .max(50)
     .required()

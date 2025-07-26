@@ -1,7 +1,6 @@
 "use strict";
 import Joi from "joi";
 
-// Validación para crear o actualizar valoraciones
 export const valoracionCreateValidation = Joi.object({
   id_producto: Joi.number().integer().positive().required().messages({
     "number.base": "El ID del producto debe ser un número",
@@ -24,7 +23,6 @@ export const valoracionCreateValidation = Joi.object({
   })
 });
 
-// Validación para actualizar valoraciones (incluye ID de valoración)
 export const valoracionUpdateValidation = Joi.object({
   id_valoracion: Joi.number().integer().positive().required().messages({
     "number.base": "El ID de la valoración debe ser un número",

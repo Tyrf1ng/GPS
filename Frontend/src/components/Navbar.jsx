@@ -30,7 +30,7 @@ function Navbar({ isOpen, setOpen }) {
         <div className="absolute left-4 z-30">
           <Hamburger toggled={isOpen} toggle={setOpen} />
         </div>
-        <h1 className="text-xl font-bold">Maderas Lemaco</h1>
+        <h1 className="text-xl font-bold">Maderas Los Alamos</h1>
 
         <nav className="hidden md:flex absolute right-4 gap-4 items-center">
           {/* Perfil con dropdown moderno */}

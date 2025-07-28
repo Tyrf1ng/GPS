@@ -11,7 +11,6 @@ export function useChilexpressData() {
       setLoading(true);
       setError(null);
       
-      // ✅ CORREGIR: Cambiar puerto 3000 por 10000
       const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:10000/api";
       const response = await fetch(`${apiUrl}/chilexpress/regiones`);
       
@@ -36,7 +35,6 @@ export function useChilexpressData() {
       setLoading(true);
       setError(null);
       
-      // ✅ CORREGIR: Cambiar puerto 3000 por 10000
       const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:10000/api";
       const response = await fetch(`${apiUrl}/chilexpress/areas-cobertura/${regionCode}`);
       
